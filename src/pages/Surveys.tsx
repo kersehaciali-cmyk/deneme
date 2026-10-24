@@ -1,6 +1,7 @@
 import { ArrowLeft, ArrowRight, Check, ClipboardPenLine, Flame, Plus, Search, ShowerHead, Snowflake, ThermometerSun, Trash2, UserRoundPlus, Wind } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Modal } from '../components/Modal'
+import { EntityDetailModal, type ProfileSubject } from '../components/EntityDetailModal'
 import { workItemDefinitions } from '../data'
 import { useApp } from '../context/AppContext'
 import { calculateSurveyTotals, formatCurrency } from '../lib/domain'
@@ -44,6 +45,7 @@ export function Surveys() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [conversion, setConversion] = useState<Survey | null>(null)
+  const [profile, setProfile] = useState<ProfileSubject | null>(null)
   const [masterId, setMasterId] = useState(() => users.find((user) => user.role === 'usta' && user.active)?.id ?? '')
   const [applicationDate, setApplicationDate] = useState(new Date().toISOString().slice(0, 10))
   const hidePrices = role === 'usta'
@@ -67,10 +69,11 @@ export function Surveys() {
         <div className="table-row table-head"><span>Keşif</span><span>Müşteri</span><span>Tür / şablon</span>{!hidePrices && <span>Teklif</span>}<span>Durum</span><span>İşlem</span></div>
         {filtered.map((survey) => {
           const customer = customers.find((item) => item.id === survey.customerId)
+          const ownerUser = users.find((user) => user.name === survey.owner)
           const alreadyProject = projects.some((project) => project.surveyId === survey.id)
           return <div className="table-row" key={survey.id}>
-            <span><strong>{survey.id}</strong><small>{new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short' }).format(new Date(survey.createdAt))} · {survey.owner}</small></span>
-            <span><span><strong>{customer?.name}</strong><small>{customer?.district}</small></span></span>
+            <span><span><strong>{survey.id}</strong><small>{new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short' }).format(new Date(survey.createdAt))} · {role === 'admin' && ownerUser && (ownerUser.role === 'usta' || ownerUser.role === 'proje') ? <button className="entity-name-link inline" onClick={() => setProfile({ kind: 'user', id: ownerUser.id })}>{survey.owner}</button> : survey.owner}</small></span></span>
+            <span><span>{role === 'admin' && customer ? <button className="entity-name-link" onClick={() => setProfile({ kind: 'customer', id: customer.id })}>{customer.name}</button> : <strong>{customer?.name}</strong>}<small>{customer?.district}</small></span></span>
             <span><i className={`type-dot type-${survey.type === 'Doğalgaz' ? 'gas' : survey.type === 'Sıhhi Tesisat' ? 'water' : survey.type === 'Klima' ? 'ac' : 'heat'}`} /><span><strong>{survey.type}</strong><small>{survey.workItemKeys?.length ?? 0} iş kalemi</small></span></span>
             {!hidePrices && <span><strong>{formatCurrency(survey.total)}</strong></span>}
             <span>{canManage ? <select className="status-select" value={survey.status} onChange={(event) => updateSurvey({ ...survey, status: event.target.value as SurveyStatus })}>{statusOptions.map((status) => <option value={status} key={status}>{status}</option>)}</select> : <em className={`status-pill status-${survey.status.toLocaleLowerCase('tr-TR').replaceAll(' ', '-')}`}>{survey.status}</em>}</span>
@@ -83,6 +86,7 @@ export function Surveys() {
     <Modal open={Boolean(conversion)} onClose={() => setConversion(null)} eyebrow="PROJEYE DÖNÜŞTÜR" title="Usta ve uygulama günü">
       {conversion && <div className="modal-form"><div className="conversion-summary"><strong>{conversion.id} · {customers.find((customer) => customer.id === conversion.customerId)?.name}</strong><span>{conversion.type} keşfi için iş ve malzeme listesi otomatik oluşturulacak.</span></div><div className="form-grid two"><label><span>Atanacak usta</span><select value={masterId} onChange={(event) => setMasterId(event.target.value)}>{users.filter((user) => user.role === 'usta' && user.active).map((user) => <option value={user.id} key={user.id}>{user.name}</option>)}</select></label><label><span>Uygulama günü</span><input type="date" value={applicationDate} onChange={(event) => setApplicationDate(event.target.value)} /></label></div><p className="form-help">Aynı güne birden fazla iş atanabilir; gün içi sıralaması saha ekibi tarafından yapılır.</p><footer className="modal-footer"><button className="secondary-button" onClick={() => setConversion(null)}>Vazgeç</button><button className="primary-button" disabled={!masterId || !applicationDate} onClick={convert}>Projeyi oluştur</button></footer></div>}
     </Modal>
+    <EntityDetailModal subject={profile} onClose={() => setProfile(null)} />
   </div>
 }
 

@@ -106,9 +106,11 @@ export interface Project {
   id: string
   customerId: string
   type: SurveyType
+  createdAt?: string
   currentStage: number
   stages: string[]
   owner: string
+  ownerId?: string
   dueDate: string
   surveyId?: string
   assignedMasterId?: string

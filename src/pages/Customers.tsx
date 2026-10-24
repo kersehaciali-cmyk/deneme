@@ -1,6 +1,7 @@
 import { MapPin, Phone, Plus, Search, UserRoundPlus } from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
 import { Modal } from '../components/Modal'
+import { EntityDetailModal, type ProfileSubject } from '../components/EntityDetailModal'
 import { useApp } from '../context/AppContext'
 import { formatCurrency, initials } from '../lib/domain'
 
@@ -8,6 +9,7 @@ export function Customers() {
   const { customers, addCustomer, role } = useApp()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
+  const [profile, setProfile] = useState<ProfileSubject | null>(null)
   const filtered = useMemo(() => customers.filter((item) => `${item.name} ${item.phone} ${item.district}`.toLocaleLowerCase('tr-TR').includes(query.toLocaleLowerCase('tr-TR'))), [customers, query])
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -27,7 +29,7 @@ export function Customers() {
     <section className="toolbar panel"><label className="list-search"><Search size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="İsim, telefon veya ilçe ara…" /></label><div className="result-count"><strong>{filtered.length}</strong> müşteri</div></section>
     <section className="customer-grid">
       {filtered.map((customer) => <article className="customer-card panel" key={customer.id}>
-        <div className="customer-card-head"><div className="avatar avatar-large">{initials(customer.name)}</div><div><h3>{customer.name}</h3><span>{customer.id.toUpperCase()}</span></div><button className="more-button">•••</button></div>
+        <div className="customer-card-head"><div className="avatar avatar-large">{initials(customer.name)}</div><div>{role === 'admin' ? <button className="entity-name-link" onClick={() => setProfile({ kind: 'customer', id: customer.id })}>{customer.name}</button> : <h3>{customer.name}</h3>}<span>{customer.id.toUpperCase()}</span></div></div>
         <div className="contact-list"><span><Phone size={16} /> {customer.phone}</span><span><MapPin size={16} /> {customer.address}, {customer.district}</span></div>
         <div className={`customer-stats ${role === 'usta' ? 'single' : ''}`}><div><span>Açık proje</span><strong>{customer.openProjectCount}</strong></div>{role !== 'usta' && <div><span>Kalan bakiye</span><strong>{formatCurrency(customer.balance)}</strong></div>}</div>
       </article>)}
@@ -41,5 +43,6 @@ export function Customers() {
         <footer className="modal-footer"><button type="button" className="secondary-button" onClick={() => setOpen(false)}>Vazgeç</button><button className="primary-button" type="submit">Müşteriyi kaydet</button></footer>
       </form>
     </Modal>
+    <EntityDetailModal subject={profile} onClose={() => setProfile(null)} />
   </div>
 }

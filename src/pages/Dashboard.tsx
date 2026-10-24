@@ -1,4 +1,6 @@
 import { ArrowRight, CalendarClock, CheckCircle2, ClipboardPlus, Clock3, PackageCheck, TrendingUp, UsersRound, WalletCards } from 'lucide-react'
+import { useState } from 'react'
+import { EntityDetailModal, type ProfileSubject } from '../components/EntityDetailModal'
 import { useApp } from '../context/AppContext'
 import { formatCurrency } from '../lib/domain'
 import type { PageKey } from '../types'
@@ -9,6 +11,7 @@ const formatWeekday = (value: string) => new Intl.DateTimeFormat('tr-TR', { week
 
 export function Dashboard({ onNavigate }: { onNavigate: (page: PageKey) => void }) {
   const { role, customers, surveys, jobs, projects, payments } = useApp()
+  const [profile, setProfile] = useState<ProfileSubject | null>(null)
   const outstanding = payments.reduce((sum, payment) => sum + payment.amount - payment.paid, 0)
   const completedJobs = jobs.filter((job) => job.status === 'Tamamlandı').length
   const activeProjects = projects.filter((project) => project.currentStage < project.stages.length - 1).length
@@ -46,7 +49,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageKey) => void 
                 <div className="timeline-item" key={job.id}>
                   <div className="time-column"><strong>{formatDay(job.appointment)}</strong><span>{formatWeekday(job.appointment)}</span></div>
                   <div className={`timeline-pin pin-${index + 1}`} />
-                  <div className="timeline-copy"><strong>{job.title}</strong><span>{customer?.name} · {customer?.district}</span></div>
+                  <div className="timeline-copy"><strong>{job.title}</strong><span>{role === 'admin' && customer ? <button className="entity-name-link inline" onClick={() => setProfile({ kind: 'customer', id: customer.id })}>{customer.name}</button> : customer?.name} · {customer?.district}</span></div>
                   <span className={`status-pill status-${job.status.toLocaleLowerCase('tr-TR').replaceAll(' ', '-')}`}>{job.status}</span>
                 </div>
               )
@@ -82,6 +85,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageKey) => void 
           ))}
         </div>
       </section>}
+      <EntityDetailModal subject={profile} onClose={() => setProfile(null)} />
     </div>
   )
 }

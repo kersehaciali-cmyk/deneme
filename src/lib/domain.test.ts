@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { calculateSurveyTotals, canAccess, projectProgress } from './domain'
-import type { Product, SurveyLine } from '../types'
+import { calculateSurveyTotals, canAccess, isProjectClosed, projectProgress, sortProjectsNewestFirst } from './domain'
+import type { Product, Project, SurveyLine } from '../types'
 
 const products: Product[] = [
   { id: 'p1', code: 'P1', name: 'Boru', category: 'Doğalgaz', unit: 'm', cost: 100, sale: 160 },
@@ -26,5 +26,16 @@ describe('domain rules', () => {
 
   it('calculates stage progress', () => {
     expect(projectProgress(3, 7)).toBe(50)
+  })
+
+  it('separates open and closed projects and sorts them newest first', () => {
+    const base = { customerId: 'c1', type: 'Doğalgaz' as const, stages: ['Planlandı', 'Tamamlandı'], owner: 'Takipçi', dueDate: '2026-11-01' }
+    const projects: Project[] = [
+      { ...base, id: 'PRJ-101', createdAt: '2026-10-20', currentStage: 0 },
+      { ...base, id: 'PRJ-102', createdAt: '2026-10-24', currentStage: 1 },
+    ]
+    expect(isProjectClosed(projects[0])).toBe(false)
+    expect(isProjectClosed(projects[1])).toBe(true)
+    expect(sortProjectsNewestFirst(projects).map((project) => project.id)).toEqual(['PRJ-102', 'PRJ-101'])
   })
 })

@@ -254,9 +254,9 @@ export const plumbingStages = ['Uygulama Planlandı', 'Malzeme Hazırlandı', 'U
 export const acStages = ['Uygulama Planlandı', 'Klima Montajı', 'Vakum ve Test', 'Devreye Alındı']
 
 export const seedProjects: Project[] = [
-  { id: 'PRJ-090', customerId: 'mus-001', type: 'Doğalgaz', currentStage: 4, stages: gasStages, owner: 'Derya Çetin', dueDate: '2026-11-08', surveyId: 'KSF-1042', assignedMasterId: 'usr-002', applicationDate: '2026-10-25', materials: [{ id: 'mat-1', productId: 'kmb-1-24', label: 'Baymak Yoğuşmalı Kombi 24 kW', quantity: 1, unit: 'adet', prepared: true }, { id: 'mat-2', productId: 'dg-hat-celik', label: 'Çelik Gaz Hattı', quantity: 18, unit: 'metre', prepared: false }], attachments: [], adminApproved: false },
-  { id: 'PRJ-091', customerId: 'mus-004', type: 'Isı Pompası', currentStage: 2, stages: heatPumpStages, owner: 'Selin Akın', dueDate: '2026-11-18' },
-  { id: 'PRJ-087', customerId: 'mus-002', type: 'Sıhhi Tesisat', currentStage: 3, stages: plumbingStages, owner: 'Derya Çetin', dueDate: '2026-10-29' },
+  { id: 'PRJ-090', customerId: 'mus-001', type: 'Doğalgaz', createdAt: '2026-10-23', currentStage: 4, stages: gasStages, owner: 'Derya Çetin', ownerId: 'usr-004', dueDate: '2026-11-08', surveyId: 'KSF-1042', assignedMasterId: 'usr-002', applicationDate: '2026-10-25', materials: [{ id: 'mat-1', productId: 'kmb-1-24', label: 'Baymak Yoğuşmalı Kombi 24 kW', quantity: 1, unit: 'adet', prepared: true }, { id: 'mat-2', productId: 'dg-hat-celik', label: 'Çelik Gaz Hattı', quantity: 18, unit: 'metre', prepared: false }], attachments: [], adminApproved: false },
+  { id: 'PRJ-091', customerId: 'mus-004', type: 'Isı Pompası', createdAt: '2026-10-24', currentStage: 2, stages: heatPumpStages, owner: 'Selin Akın', ownerId: 'usr-005', dueDate: '2026-11-18' },
+  { id: 'PRJ-087', customerId: 'mus-002', type: 'Sıhhi Tesisat', createdAt: '2026-10-18', currentStage: 3, stages: plumbingStages, owner: 'Derya Çetin', ownerId: 'usr-004', dueDate: '2026-10-29' },
 ]
 
 export const seedPayments: Payment[] = [

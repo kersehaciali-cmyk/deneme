@@ -1,6 +1,7 @@
 import { Edit3, Plus, Search, ShieldCheck, UserCheck, UserX } from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
 import { Modal } from '../components/Modal'
+import { EntityDetailModal, type ProfileSubject } from '../components/EntityDetailModal'
 import { useApp } from '../context/AppContext'
 import { initials } from '../lib/domain'
 import type { AppUser, Role } from '../types'
@@ -9,10 +10,11 @@ const roleLabels: Record<Role, string> = { admin: 'Yönetici', usta: 'Usta', pro
 const emptyUser: Omit<AppUser, 'id'> = { name: '', phone: '', email: '', role: 'usta', active: true }
 
 export function Users() {
-  const { users, addUser, updateUser } = useApp()
+  const { users, addUser, updateUser, role } = useApp()
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<AppUser | null>(null)
   const [creating, setCreating] = useState(false)
+  const [profile, setProfile] = useState<ProfileSubject | null>(null)
   const filtered = useMemo(() => users.filter((user) => `${user.name} ${user.phone} ${user.email} ${roleLabels[user.role]}`.toLocaleLowerCase('tr-TR').includes(query.toLocaleLowerCase('tr-TR'))), [query, users])
 
   const save = (event: FormEvent<HTMLFormElement>) => {
@@ -40,8 +42,9 @@ export function Users() {
       <div className="panel"><UserX /><span><strong>{users.filter((user) => !user.active).length}</strong> pasif kullanıcı</span></div>
     </section>
     <section className="toolbar panel"><label className="list-search"><Search size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="İsim, telefon, e-posta veya rol ara…" /></label><div className="result-count"><strong>{filtered.length}</strong> kullanıcı</div></section>
-    <section className="panel table-panel"><div className="data-table users-table"><div className="table-row table-head"><span>Kullanıcı</span><span>İletişim</span><span>Rol</span><span>Durum</span><span /></div>{filtered.map((user) => <div className="table-row" key={user.id}><span><i className="avatar">{initials(user.name)}</i><strong>{user.name}</strong></span><span><span><strong>{user.phone}</strong><small>{user.email}</small></span></span><span><em className={`role-badge role-${user.role}`}>{roleLabels[user.role]}</em></span><span><em className={`status-pill ${user.active ? 'status-tamamlandı' : 'status-gecikti'}`}>{user.active ? 'Aktif' : 'Pasif'}</em></span><span><button className="table-action" onClick={() => setEditing(user)}><Edit3 size={14} /> Düzenle</button></span></div>)}</div></section>
+    <section className="panel table-panel"><div className="data-table users-table"><div className="table-row table-head"><span>Kullanıcı</span><span>İletişim</span><span>Rol</span><span>Durum</span><span /></div>{filtered.map((user) => <div className="table-row" key={user.id}><span><i className="avatar">{initials(user.name)}</i>{role === 'admin' && (user.role === 'usta' || user.role === 'proje') ? <button className="entity-name-link" onClick={() => setProfile({ kind: 'user', id: user.id })}>{user.name}</button> : <strong>{user.name}</strong>}</span><span><span><strong>{user.phone}</strong><small>{user.email}</small></span></span><span><em className={`role-badge role-${user.role}`}>{roleLabels[user.role]}</em></span><span><em className={`status-pill ${user.active ? 'status-tamamlandı' : 'status-gecikti'}`}>{user.active ? 'Aktif' : 'Pasif'}</em></span><span><button className="table-action" onClick={() => setEditing(user)}><Edit3 size={14} /> Düzenle</button></span></div>)}</div></section>
     <UserModal open={creating || Boolean(editing)} user={editing} onClose={() => { setCreating(false); setEditing(null) }} onSave={save} />
+    <EntityDetailModal subject={profile} onClose={() => setProfile(null)} />
   </div>
 }
 
