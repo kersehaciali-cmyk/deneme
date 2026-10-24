@@ -54,6 +54,16 @@ export interface Survey {
   siteContactPhone?: string
   latitude?: number
   longitude?: number
+  attachments?: SurveyAttachment[]
+}
+
+export interface SurveyAttachment {
+  id: string
+  name: string
+  url: string
+  description: string
+  addedBy: string
+  createdAt: string
 }
 
 export interface Product {
@@ -153,6 +163,8 @@ export interface ProjectAttachment {
   addedBy: string
   createdAt: string
   approved: boolean
+  description?: string
+  adminComment?: string
 }
 
 export interface Payment {

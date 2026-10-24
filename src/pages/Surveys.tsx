@@ -1,11 +1,13 @@
-import { ArrowLeft, ArrowRight, Check, ClipboardPenLine, Flame, LocateFixed, MapPin, Plus, Search, ShowerHead, Snowflake, ThermometerSun, Trash2, UserRoundPlus, Wind } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { ArrowLeft, ArrowRight, Camera, Check, ClipboardPenLine, Flame, Image, LocateFixed, MapPin, Plus, Search, ShowerHead, Snowflake, ThermometerSun, Trash2, UserRoundPlus, Wind } from 'lucide-react'
+import { useMemo, useState, type ChangeEvent } from 'react'
 import { Modal } from '../components/Modal'
 import { EntityDetailModal, type ProfileSubject } from '../components/EntityDetailModal'
+import { MediaPreview } from '../components/MediaPreview'
 import { workItemDefinitions } from '../data'
 import { useApp } from '../context/AppContext'
 import { calculateSurveyTotals, formatCurrency } from '../lib/domain'
-import type { Product, Room, Survey, SurveyLine, SurveyStatus, SurveyTemplate, SurveyType } from '../types'
+import { deleteMediaFile, saveMediaFile } from '../lib/mediaStore'
+import type { Product, Role, Room, Survey, SurveyAttachment, SurveyLine, SurveyStatus, SurveyTemplate, SurveyType } from '../types'
 
 const typeOptions: { value: SurveyType; description: string; icon: typeof Flame; className: string }[] = [
   { value: 'Doğalgaz', description: 'Gaz hattı, kombi ve radyatör', icon: Flame, className: 'gas' },
@@ -18,6 +20,15 @@ const statusOptions: SurveyStatus[] = ['Taslak', 'Fiyatlandırıldı', 'Teklif G
 const projectReadyStatuses: SurveyStatus[] = ['Kabul Edildi', 'Onaylandı', 'Siparişe Alındı']
 const defaultRoomNames = ['Mutfak', 'Oturma Odası', 'Misafir Odası', 'Yatak Odası', 'Hol', 'Çocuk Odası']
 const createDefaultRooms = (): Room[] => defaultRoomNames.map((name, index) => ({ id: `room-${index + 1}`, name }))
+const attachmentAuthor = (role: Role) => role === 'usta' ? 'Saha ustası' : role === 'proje' ? 'Proje takipçisi' : 'Yönetici'
+
+function createSurveyAttachments(files: File[], role: Role) {
+  return files.map((file, index): SurveyAttachment => {
+    const id = `survey-photo-${Date.now()}-${index}-${file.name}`
+    void saveMediaFile(id, file).catch(() => undefined)
+    return { id, name: file.name, url: URL.createObjectURL(file), description: '', addedBy: attachmentAuthor(role), createdAt: new Date().toISOString() }
+  })
+}
 
 function workItemForProduct(product: Product, type: SurveyType) {
   if (product.group === 'Kombi') return 'kombi'
@@ -46,6 +57,7 @@ export function Surveys() {
   const [query, setQuery] = useState('')
   const [conversion, setConversion] = useState<Survey | null>(null)
   const [profile, setProfile] = useState<ProfileSubject | null>(null)
+  const [mediaSurveyId, setMediaSurveyId] = useState<string | null>(null)
   const [masterId, setMasterId] = useState(() => users.find((user) => user.role === 'usta' && user.active)?.id ?? '')
   const [applicationDate, setApplicationDate] = useState(new Date().toISOString().slice(0, 10))
   const hidePrices = role === 'usta'
@@ -77,7 +89,7 @@ export function Surveys() {
             <span><i className={`type-dot type-${survey.type === 'Doğalgaz' ? 'gas' : survey.type === 'Sıhhi Tesisat' ? 'water' : survey.type === 'Klima' ? 'ac' : 'heat'}`} /><span><strong>{survey.type}</strong><small>{survey.workItemKeys?.length ?? 0} iş kalemi</small></span></span>
             {!hidePrices && <span><strong>{formatCurrency(survey.total)}</strong></span>}
             <span>{canManage ? <select className="status-select" value={survey.status} onChange={(event) => updateSurvey({ ...survey, status: event.target.value as SurveyStatus })}>{statusOptions.map((status) => <option value={status} key={status}>{status}</option>)}</select> : <em className={`status-pill status-${survey.status.toLocaleLowerCase('tr-TR').replaceAll(' ', '-')}`}>{survey.status}</em>}</span>
-            <span>{alreadyProject || survey.status === 'Projeye Dönüştü' ? <button className="table-action success" disabled><Check size={14} /> Proje oluştu</button> : canManage && projectReadyStatuses.includes(survey.status) ? <button className="table-action" onClick={() => setConversion(survey)}>Projeye dönüştür <ArrowRight size={14} /></button> : <small>Teklif süreci devam ediyor</small>}</span>
+            <span><div className="survey-row-actions"><button className="table-action media-action" onClick={() => setMediaSurveyId(survey.id)}><Camera size={14} /> Fotoğraflar ({survey.attachments?.length ?? 0})</button>{alreadyProject || survey.status === 'Projeye Dönüştü' ? <button className="table-action success" disabled><Check size={14} /> Proje oluştu</button> : canManage && projectReadyStatuses.includes(survey.status) ? <button className="table-action" onClick={() => setConversion(survey)}>Projeye dönüştür <ArrowRight size={14} /></button> : <small>Teklif süreci devam ediyor</small>}</div></span>
           </div>
         })}
       </div>
@@ -86,6 +98,7 @@ export function Surveys() {
     <Modal open={Boolean(conversion)} onClose={() => setConversion(null)} eyebrow="PROJEYE DÖNÜŞTÜR" title="Usta ve uygulama günü">
       {conversion && <div className="modal-form"><div className="conversion-summary"><strong>{conversion.id} · {customers.find((customer) => customer.id === conversion.customerId)?.name}</strong><span>{conversion.type} keşfi için iş ve malzeme listesi otomatik oluşturulacak.</span></div><div className="form-grid two"><label><span>Atanacak usta</span><select value={masterId} onChange={(event) => setMasterId(event.target.value)}>{users.filter((user) => user.role === 'usta' && user.active).map((user) => <option value={user.id} key={user.id}>{user.name}</option>)}</select></label><label><span>Uygulama günü</span><input type="date" value={applicationDate} onChange={(event) => setApplicationDate(event.target.value)} /></label></div><p className="form-help">Aynı güne birden fazla iş atanabilir; gün içi sıralaması saha ekibi tarafından yapılır.</p><footer className="modal-footer"><button className="secondary-button" onClick={() => setConversion(null)}>Vazgeç</button><button className="primary-button" disabled={!masterId || !applicationDate} onClick={convert}>Projeyi oluştur</button></footer></div>}
     </Modal>
+    <SurveyMediaModal surveyId={mediaSurveyId} onClose={() => setMediaSurveyId(null)} />
     <EntityDetailModal subject={profile} onClose={() => setProfile(null)} />
   </div>
 }
@@ -118,6 +131,7 @@ function SurveyWizard({ open, onClose }: { open: boolean; onClose: () => void })
   const [heatPumpProductId, setHeatPumpProductId] = useState(() => products.find((product) => product.group === 'Isı Pompası')?.id ?? '')
   const [acProductId, setAcProductId] = useState(() => products.find((product) => product.group === 'Klima')?.id ?? '')
   const [defaultRadiatorBrand, setDefaultRadiatorBrand] = useState(() => products.find((product) => product.group === 'Radyatör')?.brand ?? '')
+  const [surveyPhotos, setSurveyPhotos] = useState<SurveyAttachment[]>([])
   const hidePrices = role === 'usta'
 
   const typeTemplates = templates.filter((template) => template.type === type)
@@ -173,8 +187,9 @@ function SurveyWizard({ open, onClose }: { open: boolean; onClose: () => void })
     }))
     setWorkItemKeys((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key])
   }
-  const resetAndClose = () => {
+  const resetAndClose = (preservePhotos = false) => {
     const customer = customers[0]
+    if (!preservePhotos) surveyPhotos.forEach((photo) => { void deleteMediaFile(photo.id).catch(() => undefined) })
     setStep(1)
     chooseType('Doğalgaz')
     setRooms(createDefaultRooms())
@@ -183,6 +198,7 @@ function SurveyWizard({ open, onClose }: { open: boolean; onClose: () => void })
     setCustomerQuery('')
     setShowNewCustomer(false)
     setLocationState('idle')
+    setSurveyPhotos([])
     onClose()
   }
   const selectCustomer = (customer: typeof customers[number]) => {
@@ -219,6 +235,11 @@ function SurveyWizard({ open, onClose }: { open: boolean; onClose: () => void })
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
     )
   }
+  const uploadSurveyPhotos = (event: ChangeEvent<HTMLInputElement>) => {
+    const attachments = createSurveyAttachments([...event.target.files ?? []], role)
+    setSurveyPhotos((current) => [...current, ...attachments])
+    event.target.value = ''
+  }
   const setQuantity = (productId: string, quantity: number) => setLines((current) => {
     const existing = current.find((line) => line.productId === productId)
     if (quantity <= 0) return current.filter((line) => line.productId !== productId)
@@ -250,8 +271,8 @@ function SurveyWizard({ open, onClose }: { open: boolean; onClose: () => void })
   const save = () => {
     const latitude = site.latitude.trim() === '' ? undefined : Number(site.latitude)
     const longitude = site.longitude.trim() === '' ? undefined : Number(site.longitude)
-    addSurvey({ id: `KSF-${1045 + surveys.length}`, customerId, type, status: role === 'usta' ? 'Taslak' : 'Fiyatlandırıldı', rooms: hasRadiators ? rooms : [], lines: effectiveLines, templateId, workItemKeys, total: grandTotal, createdAt: new Date().toISOString().slice(0, 10), owner: role === 'usta' ? 'Mehmet Usta' : role === 'proje' ? 'Derya Çetin' : 'Zeynep Şahin', siteAddress: site.address.trim(), siteContactName: site.contactName.trim(), siteContactPhone: site.contactPhone.trim(), latitude: Number.isFinite(latitude) ? latitude : undefined, longitude: Number.isFinite(longitude) ? longitude : undefined })
-    resetAndClose()
+    addSurvey({ id: `KSF-${1045 + surveys.length}`, customerId, type, status: role === 'usta' ? 'Taslak' : 'Fiyatlandırıldı', rooms: hasRadiators ? rooms : [], lines: effectiveLines, templateId, workItemKeys, total: grandTotal, createdAt: new Date().toISOString().slice(0, 10), owner: role === 'usta' ? 'Mehmet Usta' : role === 'proje' ? 'Derya Çetin' : 'Zeynep Şahin', siteAddress: site.address.trim(), siteContactName: site.contactName.trim(), siteContactPhone: site.contactPhone.trim(), latitude: Number.isFinite(latitude) ? latitude : undefined, longitude: Number.isFinite(longitude) ? longitude : undefined, attachments: surveyPhotos })
+    resetAndClose(true)
   }
 
   return <Modal open={open} onClose={resetAndClose} eyebrow="HIZLI KEŞİF" title="Yeni keşif oluştur" wide>
@@ -259,11 +280,33 @@ function SurveyWizard({ open, onClose }: { open: boolean; onClose: () => void })
     <div className="wizard-body">
       {step === 1 && <div className="wizard-section"><div className="section-title"><span>01</span><div><h3>Müşteri ve keşif türü</h3><p>Ödeme müşterisini ve uygulamanın yapılacağı yeri ayrı kaydedin.</p></div></div><div className="customer-picker-head"><label><Search size={17} /><input value={customerQuery} onChange={(event) => setCustomerQuery(event.target.value)} placeholder="İsim, telefon veya ilçe ile müşteri ara…" /></label><button className="primary-button" onClick={() => setShowNewCustomer((value) => !value)}><UserRoundPlus size={17} /> Yeni Müşteri</button></div>{showNewCustomer && <div className="new-customer-inline"><label><span>Ad soyad *</span><input value={newCustomer.name} onChange={(event) => setNewCustomer({ ...newCustomer, name: event.target.value })} /></label><label><span>Telefon *</span><input value={newCustomer.phone} onChange={(event) => setNewCustomer({ ...newCustomer, phone: event.target.value })} /></label><label><span>İlçe</span><input value={newCustomer.district} onChange={(event) => setNewCustomer({ ...newCustomer, district: event.target.value })} /></label><label><span>Adres</span><input value={newCustomer.address} onChange={(event) => setNewCustomer({ ...newCustomer, address: event.target.value })} /></label><button disabled={!newCustomer.name.trim() || !newCustomer.phone.trim()} onClick={createCustomer}><Check size={16} /> Kaydet ve seç</button></div>}<div className="customer-results">{filteredCustomers.slice(0, 6).map((customer) => <button className={customerId === customer.id ? 'selected' : ''} onClick={() => selectCustomer(customer)} key={customer.id}><span>{customer.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</span><div><strong>{customer.name}</strong><small>{customer.phone} · {customer.district}</small></div>{customerId === customer.id && <Check size={16} />}</button>)}</div><SiteDetailsEditor site={site} setSite={setSite} locationState={locationState} captureLocation={captureLocation} /><span className="choice-label">YAPILACAK KEŞİF İŞLEMİ</span><div className="type-choice-grid four">{typeOptions.map(({ value, description, icon: Icon, className }) => <button className={type === value ? 'selected' : ''} onClick={() => chooseType(value)} key={value}><span className={`type-icon ${className}`}><Icon /></span><strong>{value}</strong><small>{description}</small><i>{type === value && <Check size={14} />}</i></button>)}</div></div>}
       {step === 2 && <div className="wizard-section"><div className="section-title"><span>02</span><div><h3>Şablon ve yapılacak işler</h3><p>Şablon başlangıç seçimini yapar; aşağıdaki kalemleri serbestçe değiştirebilirsiniz.</p></div></div><label className="template-select"><span>Hazır şablon</span><select value={templateId} onChange={(event) => chooseTemplate(event.target.value)}>{typeTemplates.map((template) => <option value={template.id} key={template.id}>{template.name}</option>)}</select><small>{selectedTemplate?.workItemKeys.length ?? 0} hazır iş kalemi</small></label><div className="work-item-grid">{typeWorkItems.map((item) => <button className={workItemKeys.includes(item.key) ? 'selected' : ''} onClick={() => toggleWorkItem(item.key)} key={item.key}><span>{workItemKeys.includes(item.key) && <Check size={14} />}</span><div><strong>{item.label}</strong><small>{item.description}</small></div></button>)}</div><p className="template-note">Seçimler bu keşfe özeldir; şablonun aslı değişmez. Kalıcı şablon düzenlemelerini “Ürün & fiyatlar” ekranından yapabilirsiniz.</p></div>}
-      {step === 3 && <div className="wizard-section"><div className="section-title"><span>03</span><div><h3>Ürün, ölçü ve metrajlar</h3><p>Seçili iş kalemlerinin ürünlerini ve miktarlarını belirleyin.</p></div></div>{workItemKeys.includes('kombi') && <DeviceSelector title="Kombi" hint="Marka ve kapasite" icon={<Flame size={19} />} products={boilerProducts} selected={selectedBoiler} onSelect={(id) => setBoilerProductId(id)} hidePrices={hidePrices} />}{workItemKeys.includes('isi-pompasi') && <DeviceSelector title="Isı pompası" hint="Marka ve kapasite" icon={<Wind size={19} />} products={heatPumpProducts} selected={selectedHeatPump} onSelect={(id) => setHeatPumpProductId(id)} hidePrices={hidePrices} />}{workItemKeys.includes('klima') && <DeviceSelector title="Klima" hint="Marka ve BTU gücü" icon={<Snowflake size={19} />} products={acProducts} selected={selectedAc} onSelect={(id) => setAcProductId(id)} hidePrices={hidePrices} />}{hasRadiators && <RoomRadiators rooms={rooms} products={radiatorProducts} defaultBrand={defaultRadiatorBrand} onDefaultBrandChange={changeDefaultRadiatorBrand} hidePrices={hidePrices} addingRoom={addingRoom} newRoomName={newRoomName} setAddingRoom={setAddingRoom} setNewRoomName={setNewRoomName} addRoom={addRoom} updateRoom={updateRoom} selectPart={selectRadiatorPart} removeRoom={(id) => setRooms((current) => current.filter((room) => room.id !== id))} />} {availableProducts.length > 0 && <><span className="choice-label">MALZEME, METRAJ VE İŞÇİLİK</span><div className="product-picker">{availableProducts.map((product) => { const line = lines.find((item) => item.productId === product.id); return <div className={`picker-row ${hidePrices ? 'without-price' : ''}`} key={product.id}><div><span>{product.code}</span><strong>{product.name}</strong><small>{product.variant ?? product.unit}{!hidePrices && ` · ${formatCurrency(product.sale)} / ${product.unit}`}</small></div><div className="quantity-input"><button onClick={() => setQuantity(product.id, (line?.quantity ?? 0) - 1)}>−</button><input type="number" min="0" value={line?.quantity ?? 0} onChange={(event) => setQuantity(product.id, Number(event.target.value))} /><button onClick={() => setQuantity(product.id, (line?.quantity ?? 0) + 1)}>+</button><small>{product.unit}</small></div>{!hidePrices && <b>{formatCurrency((line?.quantity ?? 0) * product.sale)}</b>}</div> })}</div></>}<div className="inline-total"><span>{effectiveLines.length} malzeme/hizmet satırı</span>{!hidePrices && <><span>Alış toplamı {formatCurrency(totals.cost)}</span><strong>Satış toplamı {formatCurrency(totals.sale)}</strong></>}</div></div>}
-      {step === 4 && <div className={`summary-grid ${hidePrices ? 'no-price-summary' : ''}`}><div className="quote-summary"><div className="section-title"><span>04</span><div><h3>Keşif ve teklif özeti</h3><p>Kaydetmeden önce bilgileri kontrol edin.</p></div></div><dl><div><dt>Ödeme müşterisi</dt><dd>{customers.find((item) => item.id === customerId)?.name}</dd></div><div><dt>Uygulama adresi</dt><dd>{site.address}</dd></div><div><dt>Saha iletişimi</dt><dd>{site.contactName} · {site.contactPhone}</dd></div><div><dt>Konum</dt><dd>{site.latitude && site.longitude ? `${site.latitude}, ${site.longitude}` : 'Adres kullanılacak'}</dd></div><div><dt>Keşif</dt><dd>{type} · {selectedTemplate?.name}</dd></div><div><dt>Yapılacak işler</dt><dd>{workItemKeys.length} kalem</dd></div><div><dt>Malzeme/hizmet</dt><dd>{effectiveLines.length} satır</dd></div>{hasRadiators && <div><dt>Radyatörler</dt><dd>{rooms.filter((room) => room.radiatorProductId).length} oda</dd></div>}</dl><div className="selected-work-tags">{workItemKeys.map((key) => <span key={key}>{workItemDefinitions.find((item) => item.key === key)?.label}</span>)}</div>{hidePrices && <div className="master-price-note">Usta görünümünde fiyatlar gizlidir. Keşif yönetici fiyatlandırması için taslak kaydedilir.</div>}</div>{!hidePrices && <div className="price-card"><span>TEKLİF HESABI</span><div><small>Satış tutarı</small><strong>{formatCurrency(totals.sale)}</strong></div><div><small>KDV (%20)</small><strong>{formatCurrency(vat)}</strong></div><hr /><div className="grand-total"><small>Genel toplam</small><strong>{formatCurrency(grandTotal)}</strong></div><p>Alış: <b>{formatCurrency(totals.cost)}</b> · Brüt kâr: <b>{formatCurrency(totals.sale - totals.cost)}</b></p></div>}</div>}
+      {step === 3 && <div className="wizard-section"><div className="section-title"><span>03</span><div><h3>Ürün, ölçü ve metrajlar</h3><p>Seçili iş kalemlerinin ürünlerini ve miktarlarını belirleyin.</p></div></div>{workItemKeys.includes('kombi') && <DeviceSelector title="Kombi" hint="Marka ve kapasite" icon={<Flame size={19} />} products={boilerProducts} selected={selectedBoiler} onSelect={(id) => setBoilerProductId(id)} hidePrices={hidePrices} />}{workItemKeys.includes('isi-pompasi') && <DeviceSelector title="Isı pompası" hint="Marka ve kapasite" icon={<Wind size={19} />} products={heatPumpProducts} selected={selectedHeatPump} onSelect={(id) => setHeatPumpProductId(id)} hidePrices={hidePrices} />}{workItemKeys.includes('klima') && <DeviceSelector title="Klima" hint="Marka ve BTU gücü" icon={<Snowflake size={19} />} products={acProducts} selected={selectedAc} onSelect={(id) => setAcProductId(id)} hidePrices={hidePrices} />}{hasRadiators && <RoomRadiators rooms={rooms} products={radiatorProducts} defaultBrand={defaultRadiatorBrand} onDefaultBrandChange={changeDefaultRadiatorBrand} hidePrices={hidePrices} addingRoom={addingRoom} newRoomName={newRoomName} setAddingRoom={setAddingRoom} setNewRoomName={setNewRoomName} addRoom={addRoom} updateRoom={updateRoom} selectPart={selectRadiatorPart} removeRoom={(id) => setRooms((current) => current.filter((room) => room.id !== id))} />} {availableProducts.length > 0 && <><span className="choice-label">MALZEME, METRAJ VE İŞÇİLİK</span><div className="product-picker">{availableProducts.map((product) => { const line = lines.find((item) => item.productId === product.id); return <div className={`picker-row ${hidePrices ? 'without-price' : ''}`} key={product.id}><div><span>{product.code}</span><strong>{product.name}</strong><small>{product.variant ?? product.unit}{!hidePrices && ` · ${formatCurrency(product.sale)} / ${product.unit}`}</small></div><div className="quantity-input"><button onClick={() => setQuantity(product.id, (line?.quantity ?? 0) - 1)}>−</button><input type="number" min="0" value={line?.quantity ?? 0} onChange={(event) => setQuantity(product.id, Number(event.target.value))} /><button onClick={() => setQuantity(product.id, (line?.quantity ?? 0) + 1)}>+</button><small>{product.unit}</small></div>{!hidePrices && <b>{formatCurrency((line?.quantity ?? 0) * product.sale)}</b>}</div> })}</div></>}<SurveyPhotoEditor attachments={surveyPhotos} onUpload={uploadSurveyPhotos} onDescription={(id, description) => setSurveyPhotos((current) => current.map((photo) => photo.id === id ? { ...photo, description } : photo))} onRemove={(id) => { void deleteMediaFile(id).catch(() => undefined); setSurveyPhotos((current) => current.filter((photo) => photo.id !== id)) }} /><div className="inline-total"><span>{effectiveLines.length} malzeme/hizmet satırı · {surveyPhotos.length} keşif fotoğrafı</span>{!hidePrices && <><span>Alış toplamı {formatCurrency(totals.cost)}</span><strong>Satış toplamı {formatCurrency(totals.sale)}</strong></>}</div></div>}
+      {step === 4 && <div className={`summary-grid ${hidePrices ? 'no-price-summary' : ''}`}><div className="quote-summary"><div className="section-title"><span>04</span><div><h3>Keşif ve teklif özeti</h3><p>Kaydetmeden önce bilgileri kontrol edin.</p></div></div><dl><div><dt>Ödeme müşterisi</dt><dd>{customers.find((item) => item.id === customerId)?.name}</dd></div><div><dt>Uygulama adresi</dt><dd>{site.address}</dd></div><div><dt>Saha iletişimi</dt><dd>{site.contactName} · {site.contactPhone}</dd></div><div><dt>Konum</dt><dd>{site.latitude && site.longitude ? `${site.latitude}, ${site.longitude}` : 'Adres kullanılacak'}</dd></div><div><dt>Keşif fotoğrafları</dt><dd>{surveyPhotos.length}</dd></div><div><dt>Keşif</dt><dd>{type} · {selectedTemplate?.name}</dd></div><div><dt>Yapılacak işler</dt><dd>{workItemKeys.length} kalem</dd></div><div><dt>Malzeme/hizmet</dt><dd>{effectiveLines.length} satır</dd></div>{hasRadiators && <div><dt>Radyatörler</dt><dd>{rooms.filter((room) => room.radiatorProductId).length} oda</dd></div>}</dl><div className="selected-work-tags">{workItemKeys.map((key) => <span key={key}>{workItemDefinitions.find((item) => item.key === key)?.label}</span>)}</div>{hidePrices && <div className="master-price-note">Usta görünümünde fiyatlar gizlidir. Keşif yönetici fiyatlandırması için taslak kaydedilir.</div>}</div>{!hidePrices && <div className="price-card"><span>TEKLİF HESABI</span><div><small>Satış tutarı</small><strong>{formatCurrency(totals.sale)}</strong></div><div><small>KDV (%20)</small><strong>{formatCurrency(vat)}</strong></div><hr /><div className="grand-total"><small>Genel toplam</small><strong>{formatCurrency(grandTotal)}</strong></div><p>Alış: <b>{formatCurrency(totals.cost)}</b> · Brüt kâr: <b>{formatCurrency(totals.sale - totals.cost)}</b></p></div>}</div>}
     </div>
     <footer className="wizard-footer"><button className="secondary-button" onClick={() => step === 1 ? resetAndClose() : setStep((value) => value - 1)}>{step > 1 && <ArrowLeft size={17} />}{step === 1 ? 'Vazgeç' : 'Geri'}</button>{step < 4 ? <button className="primary-button" disabled={!customerId || (step === 1 && (!site.address.trim() || !site.contactName.trim() || !site.contactPhone.trim())) || (step === 2 && workItemKeys.length === 0) || (step === 3 && effectiveLines.length === 0)} onClick={() => setStep((value) => value + 1)}>Devam et <ArrowRight size={17} /></button> : <button className="primary-button" onClick={save}><Check size={17} /> Keşfi kaydet</button>}</footer>
   </Modal>
+}
+
+function SurveyMediaModal({ surveyId, onClose }: { surveyId: string | null; onClose: () => void }) {
+  const { surveys, updateSurvey, role } = useApp()
+  const survey = surveys.find((item) => item.id === surveyId)
+  if (!survey) return null
+  const attachments = survey.attachments ?? []
+  const updateAttachments = (next: SurveyAttachment[]) => updateSurvey({ ...survey, attachments: next })
+  const upload = (event: ChangeEvent<HTMLInputElement>) => {
+    updateAttachments([...attachments, ...createSurveyAttachments([...event.target.files ?? []], role)])
+    event.target.value = ''
+  }
+  return <Modal open onClose={onClose} eyebrow="KEŞİF MEDYALARI" title={`${survey.id} · Fotoğraflar`} wide>
+    <div className="survey-media-modal"><SurveyPhotoEditor attachments={attachments} onUpload={upload} onDescription={(id, description) => updateAttachments(attachments.map((photo) => photo.id === id ? { ...photo, description } : photo))} onRemove={(id) => { void deleteMediaFile(id).catch(() => undefined); updateAttachments(attachments.filter((photo) => photo.id !== id)) }} /></div>
+  </Modal>
+}
+
+function SurveyPhotoEditor({ attachments, onUpload, onDescription, onRemove }: { attachments: SurveyAttachment[]; onUpload: (event: ChangeEvent<HTMLInputElement>) => void; onDescription: (id: string, description: string) => void; onRemove: (id: string) => void }) {
+  return <section className="survey-photo-editor">
+    <header><div><Camera size={18} /><span><strong>Keşif fotoğrafları</strong><small>Her fotoğraf için açıklama ekleyin.</small></span></div><label className="upload-button"><Camera size={15} /> Fotoğraf ekle<input type="file" accept="image/*" capture="environment" multiple onChange={onUpload} /></label></header>
+    {attachments.length === 0 ? <div className="empty-evidence"><Image size={25} /><span>Henüz keşif fotoğrafı eklenmedi.</span></div> : <div className="survey-photo-grid">{attachments.map((photo) => <article key={photo.id}><MediaPreview id={photo.id} url={photo.url} type="image" alt={photo.description || photo.name} /><div><strong>{photo.name}</strong><small>{photo.addedBy} · {new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(photo.createdAt))}</small><textarea value={photo.description} onChange={(event) => onDescription(photo.id, event.target.value)} placeholder="Fotoğraf açıklaması: sorun, oda, yapılacak işlem…" /></div><button className="media-delete" onClick={() => onRemove(photo.id)} aria-label="Fotoğrafı sil"><Trash2 size={15} /></button></article>)}</div>}
+  </section>
 }
 
 type SiteState = { address: string; contactName: string; contactPhone: string; latitude: string; longitude: string }

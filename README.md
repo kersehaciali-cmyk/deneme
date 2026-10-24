@@ -13,6 +13,7 @@ Doğalgaz, ısı pompası, sıhhi tesisat ve klima firmaları için mobil uyumlu
 - Keşif adresi, saha iletişim kişisi ve müşteri/cari bilgilerinin ayrı tutulması
 - Tarayıcı konum izniyle GPS alma, manuel enlem-boylam ve Google Maps yol tarifi
 - Keşif, biten iş ve proje onayı bekleyen hızlı listeleri
+- Açıklamalı keşif fotoğrafları
 - Kombi marka ve kapasite seçimi
 - Düzenlenebilir keşif şablonları ve serbest iş kalemi seçimi
 - Klima ve ısı pompası marka/güç seçenekleri
@@ -21,13 +22,13 @@ Doğalgaz, ısı pompası, sıhhi tesisat ve klima firmaları için mobil uyumlu
 - Usta randevuları ve malzeme hazırlık listeleri
 - Kabul edilen keşfi usta ve gün atayarak projeye dönüştürme
 - Düzenlenebilir malzeme listesi ile PDF/Excel çıktısı
-- Usta fotoğraf/video yükleme ve admin onay akışı
+- Usta fotoğraf/video yükleme, açıklama, yönetici yorumu ve onay akışı
 - AKSA proje, onay, abonelik, randevu ve gaz açılış aşamaları
 - Tahsilat kaydı ve kalan bakiye takibi
 - Ürün maliyet/satış fiyatı güncelleme
 - Yönetim raporları ve mobil uyumlu arayüz
 
-Bu sürüm verileri tarayıcının `localStorage` alanında saklar. Çok kullanıcılı canlı kullanım için API, PostgreSQL, dosya depolama ve gerçek kimlik doğrulama sonraki üretim katmanıdır.
+Bu sürüm kayıt verilerini tarayıcının `localStorage`, medya dosyalarını `IndexedDB` alanında saklar. Çok kullanıcılı canlı kullanım için API, PostgreSQL, merkezi dosya depolama ve gerçek kimlik doğrulama sonraki üretim katmanıdır.
 
 ## Geliştirme
 
