@@ -35,6 +35,8 @@ export interface SurveyLine {
   roomId: string
   productId: string
   quantity: number
+  unitCost?: number
+  unitSale?: number
 }
 
 export interface Survey {

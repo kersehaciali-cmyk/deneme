@@ -3,6 +3,7 @@ import { useMemo, useState, type ChangeEvent } from 'react'
 import { Modal } from '../components/Modal'
 import { EntityDetailModal, type ProfileSubject } from '../components/EntityDetailModal'
 import { MediaPreview } from '../components/MediaPreview'
+import { SurveyDetailModal } from '../components/SurveyDetailModal'
 import { workItemDefinitions } from '../data'
 import { useApp } from '../context/AppContext'
 import { calculateSurveyTotals, formatCurrency } from '../lib/domain'
@@ -57,6 +58,7 @@ export function Surveys() {
   const [query, setQuery] = useState('')
   const [conversion, setConversion] = useState<Survey | null>(null)
   const [profile, setProfile] = useState<ProfileSubject | null>(null)
+  const [detailSurveyId, setDetailSurveyId] = useState<string | null>(null)
   const [mediaSurveyId, setMediaSurveyId] = useState<string | null>(null)
   const [masterId, setMasterId] = useState(() => users.find((user) => user.role === 'usta' && user.active)?.id ?? '')
   const [applicationDate, setApplicationDate] = useState(new Date().toISOString().slice(0, 10))
@@ -89,7 +91,7 @@ export function Surveys() {
             <span><i className={`type-dot type-${survey.type === 'Doğalgaz' ? 'gas' : survey.type === 'Sıhhi Tesisat' ? 'water' : survey.type === 'Klima' ? 'ac' : 'heat'}`} /><span><strong>{survey.type}</strong><small>{survey.workItemKeys?.length ?? 0} iş kalemi</small></span></span>
             {!hidePrices && <span><strong>{formatCurrency(survey.total)}</strong></span>}
             <span>{canManage ? <select className="status-select" value={survey.status} onChange={(event) => updateSurvey({ ...survey, status: event.target.value as SurveyStatus })}>{statusOptions.map((status) => <option value={status} key={status}>{status}</option>)}</select> : <em className={`status-pill status-${survey.status.toLocaleLowerCase('tr-TR').replaceAll(' ', '-')}`}>{survey.status}</em>}</span>
-            <span><div className="survey-row-actions"><button className="table-action media-action" onClick={() => setMediaSurveyId(survey.id)}><Camera size={14} /> Fotoğraflar ({survey.attachments?.length ?? 0})</button>{alreadyProject || survey.status === 'Projeye Dönüştü' ? <button className="table-action success" disabled><Check size={14} /> Proje oluştu</button> : canManage && projectReadyStatuses.includes(survey.status) ? <button className="table-action" onClick={() => setConversion(survey)}>Projeye dönüştür <ArrowRight size={14} /></button> : <small>Teklif süreci devam ediyor</small>}</div></span>
+            <span><div className="survey-row-actions"><button className="table-action detail-action" onClick={() => setDetailSurveyId(survey.id)}><ClipboardPenLine size={14} /> Detay</button><button className="table-action media-action" onClick={() => setMediaSurveyId(survey.id)}><Camera size={14} /> Fotoğraflar ({survey.attachments?.length ?? 0})</button>{alreadyProject || survey.status === 'Projeye Dönüştü' ? <button className="table-action success" disabled><Check size={14} /> Proje oluştu</button> : canManage && projectReadyStatuses.includes(survey.status) ? <button className="table-action" onClick={() => setConversion(survey)}>Projeye dönüştür <ArrowRight size={14} /></button> : <small>Teklif süreci devam ediyor</small>}</div></span>
           </div>
         })}
       </div>
@@ -98,6 +100,7 @@ export function Surveys() {
     <Modal open={Boolean(conversion)} onClose={() => setConversion(null)} eyebrow="PROJEYE DÖNÜŞTÜR" title="Usta ve uygulama günü">
       {conversion && <div className="modal-form"><div className="conversion-summary"><strong>{conversion.id} · {customers.find((customer) => customer.id === conversion.customerId)?.name}</strong><span>{conversion.type} keşfi için iş ve malzeme listesi otomatik oluşturulacak.</span></div><div className="form-grid two"><label><span>Atanacak usta</span><select value={masterId} onChange={(event) => setMasterId(event.target.value)}>{users.filter((user) => user.role === 'usta' && user.active).map((user) => <option value={user.id} key={user.id}>{user.name}</option>)}</select></label><label><span>Uygulama günü</span><input type="date" value={applicationDate} onChange={(event) => setApplicationDate(event.target.value)} /></label></div><p className="form-help">Aynı güne birden fazla iş atanabilir; gün içi sıralaması saha ekibi tarafından yapılır.</p><footer className="modal-footer"><button className="secondary-button" onClick={() => setConversion(null)}>Vazgeç</button><button className="primary-button" disabled={!masterId || !applicationDate} onClick={convert}>Projeyi oluştur</button></footer></div>}
     </Modal>
+    <SurveyDetailModal surveyId={detailSurveyId} onClose={() => setDetailSurveyId(null)} />
     <SurveyMediaModal surveyId={mediaSurveyId} onClose={() => setMediaSurveyId(null)} />
     <EntityDetailModal subject={profile} onClose={() => setProfile(null)} />
   </div>
@@ -271,7 +274,11 @@ function SurveyWizard({ open, onClose }: { open: boolean; onClose: () => void })
   const save = () => {
     const latitude = site.latitude.trim() === '' ? undefined : Number(site.latitude)
     const longitude = site.longitude.trim() === '' ? undefined : Number(site.longitude)
-    addSurvey({ id: `KSF-${1045 + surveys.length}`, customerId, type, status: role === 'usta' ? 'Taslak' : 'Fiyatlandırıldı', rooms: hasRadiators ? rooms : [], lines: effectiveLines, templateId, workItemKeys, total: grandTotal, createdAt: new Date().toISOString().slice(0, 10), owner: role === 'usta' ? 'Mehmet Usta' : role === 'proje' ? 'Derya Çetin' : 'Zeynep Şahin', siteAddress: site.address.trim(), siteContactName: site.contactName.trim(), siteContactPhone: site.contactPhone.trim(), latitude: Number.isFinite(latitude) ? latitude : undefined, longitude: Number.isFinite(longitude) ? longitude : undefined, attachments: surveyPhotos })
+    const pricedLines = effectiveLines.map((line) => {
+      const product = products.find((item) => item.id === line.productId)
+      return { ...line, unitCost: product?.cost, unitSale: product?.sale }
+    })
+    addSurvey({ id: `KSF-${1045 + surveys.length}`, customerId, type, status: role === 'usta' ? 'Taslak' : 'Fiyatlandırıldı', rooms: hasRadiators ? rooms : [], lines: pricedLines, templateId, workItemKeys, total: grandTotal, createdAt: new Date().toISOString().slice(0, 10), owner: role === 'usta' ? 'Mehmet Usta' : role === 'proje' ? 'Derya Çetin' : 'Zeynep Şahin', siteAddress: site.address.trim(), siteContactName: site.contactName.trim(), siteContactPhone: site.contactPhone.trim(), latitude: Number.isFinite(latitude) ? latitude : undefined, longitude: Number.isFinite(longitude) ? longitude : undefined, attachments: surveyPhotos })
     resetAndClose(true)
   }
 

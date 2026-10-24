@@ -15,9 +15,11 @@ export function calculateSurveyTotals(lines: SurveyLine[], products: Product[]) 
   return lines.reduce(
     (totals, line) => {
       const product = products.find((item) => item.id === line.productId)
-      if (!product) return totals
-      totals.cost += product.cost * line.quantity
-      totals.sale += product.sale * line.quantity
+      const unitCost = line.unitCost ?? product?.cost
+      const unitSale = line.unitSale ?? product?.sale
+      if (unitCost === undefined || unitSale === undefined) return totals
+      totals.cost += unitCost * line.quantity
+      totals.sale += unitSale * line.quantity
       return totals
     },
     { cost: 0, sale: 0 },

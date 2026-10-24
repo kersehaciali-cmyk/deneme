@@ -16,6 +16,13 @@ describe('domain rules', () => {
     expect(calculateSurveyTotals(lines, products)).toEqual({ cost: 1400, sale: 2200 })
   })
 
+  it('keeps the price captured when the survey was prepared', () => {
+    const lines: SurveyLine[] = [
+      { id: 'l1', roomId: 'r1', productId: 'p1', quantity: 2, unitCost: 90, unitSale: 140 },
+    ]
+    expect(calculateSurveyTotals(lines, products)).toEqual({ cost: 180, sale: 280 })
+  })
+
   it('keeps customer away from administrative pages', () => {
     expect(canAccess('musteri', 'catalog')).toBe(false)
     expect(canAccess('admin', 'catalog')).toBe(true)
