@@ -39,7 +39,7 @@ export function Projects() {
     const popup = window.open('', '_blank', 'width=850,height=700')
     if (!popup) return
     const rows = (project.materials ?? []).map((item) => `<tr><td>${escapeHtml(item.label)}</td><td>${item.quantity}</td><td>${escapeHtml(item.unit)}</td><td>${item.prepared ? 'Hazır' : 'Bekliyor'}</td></tr>`).join('')
-    popup.document.write(`<html><head><title>${escapeHtml(project.id)} Malzeme Listesi</title><style>body{font-family:Arial;padding:32px;color:#173333}h1{font-size:24px}p{color:#65736f}table{width:100%;border-collapse:collapse;margin-top:24px}th,td{padding:10px;border:1px solid #dfe3dd;text-align:left}th{background:#eef4f1}</style></head><body><h1>Tesisat Pro · Malzeme Listesi</h1><p>${escapeHtml(project.id)} · ${escapeHtml(customer?.name ?? '')} · ${escapeHtml(project.type)}</p><table><thead><tr><th>Malzeme</th><th>Miktar</th><th>Birim</th><th>Durum</th></tr></thead><tbody>${rows}</tbody></table><script>window.onload=()=>window.print()</script></body></html>`)
+    popup.document.write(`<html><head><title>${escapeHtml(project.id)} Malzeme Listesi</title><style>body{font-family:Arial;padding:32px;color:#173333}h1{font-size:24px}p{color:#65736f}table{width:100%;border-collapse:collapse;margin-top:24px}th,td{padding:10px;border:1px solid #dfe3dd;text-align:left}th{background:#eef4f1}</style></head><body><h1>Tesisat PRO · Malzeme Listesi</h1><p>${escapeHtml(project.id)} · ${escapeHtml(customer?.name ?? '')} · ${escapeHtml(project.type)}</p><table><thead><tr><th>Malzeme</th><th>Miktar</th><th>Birim</th><th>Durum</th></tr></thead><tbody>${rows}</tbody></table><script>window.onload=()=>window.print()</script></body></html>`)
     popup.document.close()
   }
 
