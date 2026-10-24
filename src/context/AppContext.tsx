@@ -12,7 +12,7 @@ interface AppState {
   currentUser: AppUser
   syncStatus: SyncStatus
   users: AppUser[]
-  addUser: (user: Omit<AppUser, 'id'>) => Promise<void>
+  addUser: (user: Omit<AppUser, 'id'>, password?: string) => Promise<void>
   updateUser: (user: AppUser, password?: string) => Promise<void>
   customers: Customer[]
   addCustomer: (customer: Omit<Customer, 'id' | 'createdAt' | 'openProjectCount' | 'balance'>) => Customer
@@ -135,9 +135,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     currentUser: profile!,
     syncStatus,
     users,
-    addUser: async (user) => {
+    addUser: async (user, password) => {
       if (!supabase) throw new Error('Bulut bağlantısı bulunamadı.')
-      const { error } = await supabase.functions.invoke('admin-users', { body: { action: 'create', user } })
+      const { error } = await supabase.functions.invoke('admin-users', { body: { action: 'create', user, password: password || undefined } })
       if (error) throw error
       await loadCloudData()
     },

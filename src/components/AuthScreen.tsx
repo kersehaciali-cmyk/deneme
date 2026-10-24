@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 
 function errorMessage(error: unknown) {
   if (!(error instanceof Error)) return 'İşlem tamamlanamadı. Lütfen tekrar deneyin.'
-  if (error.message.includes('Invalid login credentials')) return 'E-posta veya şifre hatalı.'
+  if (error.message.includes('Invalid login credentials')) return 'E-posta/telefon veya şifre hatalı.'
   if (error.message.includes('Email not confirmed')) return 'E-posta hesabı henüz doğrulanmamış.'
   return error.message
 }
@@ -34,7 +34,7 @@ function AuthLayout({ children }: { children: ReactNode }) {
 function LoginForm() {
   const { signIn, sendPasswordReset } = useAuth()
   const [resetMode, setResetMode] = useState(false)
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -45,9 +45,9 @@ function LoginForm() {
     setBusy(true); setError(''); setMessage('')
     try {
       if (resetMode) {
-        await sendPasswordReset(email)
+        await sendPasswordReset(identifier)
         setMessage('Şifre yenileme bağlantısı e-posta adresinize gönderildi.')
-      } else await signIn(email, password)
+      } else await signIn(identifier, password)
     } catch (reason) {
       setError(errorMessage(reason))
     } finally {
@@ -58,8 +58,8 @@ function LoginForm() {
   return <AuthLayout><form className="auth-form" onSubmit={submit}>
     <span className="eyebrow">{resetMode ? 'ŞİFRE YENİLEME' : 'GÜVENLİ GİRİŞ'}</span>
     <h2>{resetMode ? 'Şifrenizi sıfırlayın' : 'Hesabınıza giriş yapın'}</h2>
-    <p>{resetMode ? 'Kayıtlı e-posta adresinizi yazın; size güvenli yenileme bağlantısı gönderelim.' : 'Yöneticinizin oluşturduğu e-posta ve şifrenizle devam edin.'}</p>
-    <label><span>E-posta adresi</span><div><Mail size={18} /><input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="ornek@sirket.com" required /></div></label>
+    <p>{resetMode ? 'Kayıtlı e-posta adresinizi yazın; size güvenli yenileme bağlantısı gönderelim.' : 'E-posta adresiniz veya telefon numaranız ve şifrenizle devam edin.'}</p>
+    <label><span>{resetMode ? 'E-posta adresi' : 'E-posta veya telefon'}</span><div><Mail size={18} /><input type={resetMode ? 'email' : 'text'} autoComplete={resetMode ? 'email' : 'username'} value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder={resetMode ? 'ornek@sirket.com' : 'ornek@sirket.com veya 05xx…'} required /></div></label>
     {!resetMode && <label><span>Şifre</span><div><KeyRound size={18} /><input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="••••••••" minLength={8} required /></div></label>}
     {error && <div className="auth-message error">{error}</div>}
     {message && <div className="auth-message success"><CheckCircle2 size={16} /> {message}</div>}

@@ -11,6 +11,7 @@
     "desktop:run": "npm run build && electron .",
     "desktop:build": "npm run build && electron-builder --win nsis",
     "mobile:sync": "npm run build && cap sync android",
+    "mobile:apk": "npm run mobile:sync && node scripts/build-android.mjs",
     "mobile:open": "cap open android"
   },
   "dependencies": {

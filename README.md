@@ -50,6 +50,9 @@ npm run desktop:build
 # Android web dosyalarını yerel projeye aktar
 npm run mobile:sync
 
+# Deneme APK'sını tek komutla üret
+npm run mobile:apk
+
 # Android Studio'da aç
 npm run mobile:open
 ```

@@ -99,7 +99,14 @@ npm.cmd run desktop:run
 Önce web arayüzünü Android projesine aktarın:
 
 ```powershell
-npm.cmd run mobile:sync
+npm.cmd run mobile:apk
+```
+
+Komut tamamlanınca kurulabilir deneme APK'sı `release\Tesisat-PRO-debug.apk` yolunda oluşur.
+
+Android Studio üzerinden çalıştırmak veya imzalı sürüm almak için:
+
+```powershell
 npm.cmd run mobile:open
 ```
 
@@ -114,11 +121,11 @@ Android Studio açıldığında Gradle eşitlemesinin bitmesini bekleyin. Deneme
 ## 8. Yeni kullanıcı akışı
 
 1. Yönetici Tesisat PRO içindeki **Kullanıcılar → Yeni kullanıcı** ekranından hesabı oluşturur.
-2. Kullanıcıya e-postayla davet bağlantısı gelir.
-3. Kullanıcı bağlantıyı açıp ilk şifresini belirler.
-4. Sonraki girişlerini Windows, web veya Android uygulamasından aynı e-posta ve şifreyle yapar.
-5. Kullanıcı **Şifremi unuttum** bağlantısından e-postayla şifresini yenileyebilir.
-6. Yönetici kullanıcı düzenleme ekranından doğrudan yeni şifre atayabilir veya hesabı pasif yapabilir.
+2. E-posta girilmişse kullanıcıya davet bağlantısı gelir ve kullanıcı ilk şifresini belirler.
+3. E-posta girilmemişse yönetici ilk şifreyi belirler; kullanıcı telefon numarası ve bu şifreyle giriş yapar.
+4. E-postalı kullanıcı **Şifremi unuttum** bağlantısından şifresini yenileyebilir.
+5. Telefonla giriş yapan kullanıcının şifresini yönetici kullanıcı düzenleme ekranından değiştirir.
+6. Yönetici gerektiğinde hesabı pasif yapabilir.
 
 ## 9. Güncelleme
 

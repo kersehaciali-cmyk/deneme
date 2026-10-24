@@ -10,7 +10,7 @@ interface AuthState {
   user: User | null
   profile: AppUser | null
   passwordRecovery: boolean
-  signIn: (email: string, password: string) => Promise<void>
+  signIn: (identifier: string, password: string) => Promise<void>
   signOut: () => Promise<void>
   sendPasswordReset: (email: string) => Promise<void>
   updateOwnPassword: (password: string) => Promise<void>
@@ -23,6 +23,14 @@ const AuthContext = createContext<AuthState | undefined>(undefined)
 function isPasswordLink() {
   const link = `${window.location.search}${window.location.hash}`
   return link.includes('type=recovery') || link.includes('type=invite')
+}
+
+function loginEmail(identifier: string) {
+  const value = identifier.trim().toLocaleLowerCase('tr-TR')
+  if (value.includes('@')) return value
+  const phone = value.replace(/\D/g, '')
+  if (phone.length < 10) throw new Error('Geçerli bir e-posta veya telefon numarası yazın.')
+  return `${phone}@phone.tesisatpro.local`
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -83,9 +91,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user: session?.user ?? null,
     profile,
     passwordRecovery,
-    signIn: async (email, password) => {
+    signIn: async (identifier, password) => {
       if (!supabase) throw new Error('Bulut bağlantısı yapılandırılmamış.')
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      const { error } = await supabase.auth.signInWithPassword({ email: loginEmail(identifier), password })
       if (error) throw error
     },
     signOut: async () => {
@@ -96,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     sendPasswordReset: async (email) => {
       if (!supabase) throw new Error('Bulut bağlantısı yapılandırılmamış.')
+      if (!email.includes('@')) throw new Error('Telefonla giriş yapan hesapların şifresini yönetici değiştirmelidir.')
       const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: publicAppUrl })
       if (error) throw error
     },
