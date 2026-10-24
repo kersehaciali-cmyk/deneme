@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calculateSurveyTotals, canAccess, isProjectClosed, projectProgress, sortProjectsNewestFirst } from './domain'
+import { calculateSurveyTotals, canAccess, directionsUrl, isProjectClosed, projectProgress, sortProjectsNewestFirst } from './domain'
 import type { Product, Project, SurveyLine } from '../types'
 
 const products: Product[] = [
@@ -37,5 +37,11 @@ describe('domain rules', () => {
     expect(isProjectClosed(projects[0])).toBe(false)
     expect(isProjectClosed(projects[1])).toBe(true)
     expect(sortProjectsNewestFirst(projects).map((project) => project.id)).toEqual(['PRJ-102', 'PRJ-101'])
+  })
+
+  it('builds directions from coordinates and falls back to the site address', () => {
+    expect(directionsUrl(39.7767, 30.5206, 'Yedek adres')).toContain('39.7767%2C30.5206')
+    expect(directionsUrl(undefined, undefined, 'Gül Sokak No: 7')).toContain('G%C3%BCl%20Sokak%20No%3A%207')
+    expect(directionsUrl()).toBeUndefined()
   })
 })

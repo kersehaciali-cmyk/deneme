@@ -10,6 +10,9 @@ Doğalgaz, ısı pompası, sıhhi tesisat ve klima firmaları için mobil uyumlu
 - Dört adımlı hızlı keşif akışı
 - Hazır oda şablonları ve yeni oda ekleme
 - Oda bazında radyatör marka/ölçü seçimi
+- Keşif adresi, saha iletişim kişisi ve müşteri/cari bilgilerinin ayrı tutulması
+- Tarayıcı konum izniyle GPS alma, manuel enlem-boylam ve Google Maps yol tarifi
+- Keşif, biten iş ve proje onayı bekleyen hızlı listeleri
 - Kombi marka ve kapasite seçimi
 - Düzenlenebilir keşif şablonları ve serbest iş kalemi seçimi
 - Klima ve ısı pompası marka/güç seçenekleri

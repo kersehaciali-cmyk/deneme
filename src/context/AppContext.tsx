@@ -122,6 +122,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         dueDate: due.toISOString().slice(0, 10),
         assignedMasterId: masterId,
         applicationDate,
+        siteAddress: survey.siteAddress,
+        siteContactName: survey.siteContactName,
+        siteContactPhone: survey.siteContactPhone,
+        latitude: survey.latitude,
+        longitude: survey.longitude,
         materials,
         attachments: [],
         adminApproved: false,
@@ -132,10 +137,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const job: Job = {
         id: `IS-${300 + jobs.length}`,
         customerId: survey.customerId,
+        projectId: project.id,
         title: `${survey.type} uygulaması`,
         assignee: master?.name ?? 'Atanmadı',
         appointment: applicationDate,
         status: 'Planlandı',
+        siteAddress: survey.siteAddress,
+        siteContactName: survey.siteContactName,
+        siteContactPhone: survey.siteContactPhone,
+        latitude: survey.latitude,
+        longitude: survey.longitude,
         checklist: materials.map((material) => ({ id: `check-${material.id}`, label: `${material.label} · ${material.quantity} ${material.unit}`, done: false })),
       }
       setJobs((current) => [job, ...current])

@@ -245,6 +245,21 @@ h1, h2, h3, strong { font-family: Inter, 'Segoe UI', system-ui, sans-serif; }
 .customer-results strong { font-size: 9px; }
 .customer-results small { color: #8d9895; font-size: 7.5px; margin-top: 3px; }
 .customer-results svg { color: var(--teal); }
+.survey-site-card { margin-top: 13px; padding: 14px; border: 1px solid #cedee8; border-radius: 11px; background: #f6fafc; }
+.survey-site-card > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.survey-site-card > header > div { display: flex; align-items: center; gap: 9px; color: var(--teal); }
+.survey-site-card > header strong, .survey-site-card > header small { display: block; }
+.survey-site-card > header strong { color: var(--ink); font-size: 10px; }
+.survey-site-card > header small { margin-top: 2px; color: #7e8e9d; font-size: 7.5px; }
+.survey-site-card > header button { min-height: 34px; display: flex; align-items: center; gap: 6px; border: 1px solid #bcd3df; border-radius: 8px; background: #fff; color: var(--teal); padding: 0 10px; font-size: 8px; font-weight: 800; }
+.site-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 13px; }
+.site-form-grid .site-address { grid-column: 1 / -1; }
+.site-form-grid label > span { display: block; margin-bottom: 4px; color: #65788a; font-size: 8px; font-weight: 700; }
+.site-form-grid input { width: 100%; height: 36px; border: 1px solid #d5dfe7; border-radius: 7px; background: #fff; color: var(--ink); padding: 0 9px; outline: 0; font-size: 9px; }
+.site-form-grid input:focus { border-color: #6da4bb; box-shadow: 0 0 0 3px rgba(23,107,135,.08); }
+.location-feedback { margin: 10px 0 0; color: #718395; font-size: 8px; line-height: 1.5; }
+.location-feedback.success { color: #3f7d62; }
+.location-feedback.error { color: #a45e36; }
 .choice-label { display: block; color: #84918e; font-size: 8px; font-weight: 800; letter-spacing: .12em; margin: 20px 0 8px; }
 .radiator-default-brand { display: flex; align-items: center; gap: 18px; padding: 12px 14px; margin-bottom: 10px; border: 1px solid #cfe0ea; border-radius: 9px; background: #f2f8fb; }
 .radiator-default-brand label { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
@@ -366,6 +381,12 @@ h1, h2, h3, strong { font-family: Inter, 'Segoe UI', system-ui, sans-serif; }
 .job-meta span { display: block; font-size: 8px; color: #8c9895; }
 .job-meta strong, .job-meta input { display: block; color: var(--ink); font-size: 9px; margin-top: 2px; }
 .job-meta input { border: 0; padding: 0; background: transparent; max-width: 145px; }
+.job-site-info, .project-site-info { display: grid; grid-template-columns: minmax(0,1.4fr) minmax(0,1fr) auto; align-items: center; gap: 13px; padding: 11px 19px; border-bottom: 1px solid #e2e8ee; background: #eef5f8; }
+.job-site-info > div, .project-site-info > div { display: flex; align-items: flex-start; gap: 8px; min-width: 0; color: var(--teal); }
+.job-site-info span, .project-site-info span { min-width: 0; color: #7a8998; font-size: 7.5px; }
+.job-site-info strong, .project-site-info strong { display: block; overflow: hidden; margin-top: 3px; color: var(--ink); font-size: 8.5px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.job-site-info > button, .project-site-info > button { min-height: 34px; display: flex; align-items: center; gap: 6px; border: 0; border-radius: 8px; background: var(--teal); color: #fff; padding: 0 11px; font-size: 8px; font-weight: 800; white-space: nowrap; }
+.job-site-info > button:disabled, .project-site-info > button:disabled { opacity: .45; }
 .material-head { padding: 14px 19px 8px; }
 .material-head > div:first-child { display: flex; justify-content: space-between; }
 .material-head strong, .material-head span { font-size: 9px; }
@@ -395,6 +416,7 @@ h1, h2, h3, strong { font-family: Inter, 'Segoe UI', system-ui, sans-serif; }
 .project-progress-number strong { color: var(--teal); font-size: 22px; }
 .project-progress-number span { color: #919c99; font-size: 8px; }
 .project-progress { margin: 16px 0 19px; height: 6px; }
+.project-site-info { margin: 17px -20px 0; border-top: 1px solid #dce5eb; border-bottom: 0; padding-left: 20px; padding-right: 20px; }
 .stage-track { display: grid; grid-template-columns: repeat(8, minmax(0,1fr)); gap: 5px; }
 .stage-track > div { position: relative; text-align: center; color: #9aa3a1; }
 .stage-track > div::before { content: ''; position: absolute; left: -50%; right: 50%; top: 12px; height: 1px; background: #dfe2dc; }
@@ -537,6 +559,9 @@ h1, h2, h3, strong { font-family: Inter, 'Segoe UI', system-ui, sans-serif; }
 .entity-project-stage b { color: #465a6e; }
 .entity-project-progress { grid-column: 1 / -1; height: 4px; overflow: hidden; border-radius: 4px; background: #e6ebf0; }
 .entity-project-progress span { display: block; height: 100%; border-radius: inherit; background: var(--teal); }
+.entity-project-site { grid-column: 1 / -1; display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; color: #66798c; font-size: 7.5px; }
+.entity-project-site span { display: flex; align-items: flex-start; gap: 5px; min-width: 0; line-height: 1.4; }
+.entity-project-site svg { flex: 0 0 auto; color: var(--teal); }
 .account-totals { display: flex; align-items: center; gap: 13px; color: #758598; font-size: 8px; }
 .account-totals b { display: block; margin-top: 2px; color: var(--ink); font-size: 10px; }
 .account-list { display: flex; flex-direction: column; }
@@ -549,6 +574,28 @@ h1, h2, h3, strong { font-family: Inter, 'Segoe UI', system-ui, sans-serif; }
 .account-list > article > div:nth-child(3) { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
 .account-list > article > div:nth-child(3) span { color: #8795a3; font-size: 7px; }
 .account-list > article > div:nth-child(3) strong { display: block; margin-top: 2px; color: var(--ink); font-size: 8px; }
+
+/* Operational lists */
+.operations-lists { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }
+.operations-list-card { min-width: 0; overflow: hidden; }
+.operations-list-card > header { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border-bottom: 1px solid #e5eaf0; background: #f7f9fb; }
+.operations-list-card > header > div { display: flex; align-items: center; gap: 8px; color: var(--teal); }
+.operations-list-card > header > div > svg { width: 19px; }
+.operations-list-card > header strong, .operations-list-card > header small { display: block; }
+.operations-list-card > header strong { color: var(--ink); font-size: 10px; }
+.operations-list-card > header small { margin-top: 2px; color: #8190a0; font-size: 7.5px; }
+.operations-list-card > header > button { display: flex; align-items: center; gap: 3px; border: 0; background: transparent; color: var(--teal); padding: 4px; font-size: 7.5px; font-weight: 800; white-space: nowrap; }
+.operations-list-card > div { padding: 2px 13px; }
+.operations-list-card > div > p { padding: 18px 0; margin: 0; color: #8391a0; font-size: 8px; text-align: center; }
+.operations-list-row { width: 100%; min-height: 51px; display: flex; align-items: center; justify-content: space-between; gap: 9px; border: 0; border-top: 1px solid #ebeff3; background: transparent; color: var(--ink); padding: 8px 1px; text-align: left; }
+.operations-list-row:first-child { border-top: 0; }
+.operations-list-row:hover { color: var(--teal); }
+.operations-list-row span { min-width: 0; }
+.operations-list-row strong, .operations-list-row small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.operations-list-row strong { font-size: 8.5px; }
+.operations-list-row small { margin-top: 3px; color: #81909f; font-size: 7.5px; }
+.operations-list-row > svg { flex: 0 0 auto; color: var(--teal); }
+.empty-list { grid-column: 1 / -1; padding: 28px; color: #7c8b99; font-size: 9px; text-align: center; }
 
 /* Survey workflow */
 .survey-workflow-table { min-width: 950px; }
@@ -675,6 +722,7 @@ h1, h2, h3, strong { font-family: Inter, 'Segoe UI', system-ui, sans-serif; }
   .plan-builder { grid-template-columns: 1fr; }
   .room-editor { border-right: 0; border-bottom: 1px solid #e8e7e1; }
   .floor-canvas { min-height: 260px; }
+  .operations-lists { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 650px) {
@@ -714,6 +762,10 @@ h1, h2, h3, strong { font-family: Inter, 'Segoe UI', system-ui, sans-serif; }
   .new-customer-inline { grid-template-columns: 1fr; }
   .new-customer-inline > button { grid-column: 1; }
   .customer-results { grid-template-columns: 1fr; }
+  .survey-site-card > header { align-items: stretch; flex-direction: column; }
+  .survey-site-card > header button { justify-content: center; }
+  .site-form-grid { grid-template-columns: 1fr; }
+  .site-form-grid .site-address { grid-column: 1; }
   .radiator-section { padding: 12px; }
   .radiator-section-head { align-items: flex-start; gap: 10px; }
   .radiator-section-head > b { padding-top: 2px; white-space: nowrap; }
@@ -751,6 +803,7 @@ h1, h2, h3, strong { font-family: Inter, 'Segoe UI', system-ui, sans-serif; }
   .entity-project-main strong { white-space: normal; }
   .entity-project-main small { align-items: flex-start; flex-wrap: wrap; line-height: 1.5; }
   .entity-project-stage { grid-template-columns: 1fr; gap: 5px; }
+  .entity-project-site { grid-template-columns: 1fr; gap: 5px; }
   .account-section > header { align-items: stretch; flex-direction: column; }
   .account-totals { justify-content: space-between; }
   .account-list > article { grid-template-columns: 32px minmax(0,1fr) auto; gap: 8px; padding: 10px 0; }
@@ -770,6 +823,12 @@ h1, h2, h3, strong { font-family: Inter, 'Segoe UI', system-ui, sans-serif; }
   .job-summary-strip > div { flex: 0 0 auto; }
   .job-meta { grid-template-columns: 1fr; gap: 10px; }
   .job-meta > * + * { border-left: 0; padding-left: 0; }
+  .job-site-info, .project-site-info { grid-template-columns: 1fr; gap: 9px; }
+  .job-site-info strong, .project-site-info strong { white-space: normal; }
+  .job-site-info > button, .project-site-info > button { justify-content: center; }
+  .project-site-info { margin-left: -20px; margin-right: -20px; }
+  .project-filters { width: 100%; overflow-x: auto; }
+  .project-filters button { flex: 0 0 auto; }
   .stage-track { overflow-x: auto; grid-template-columns: repeat(8, 80px); padding-bottom: 6px; }
   .project-card > footer { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .project-card footer button { margin: 0; }

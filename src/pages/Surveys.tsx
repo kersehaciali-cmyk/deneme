@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Check, ClipboardPenLine, Flame, Plus, Search, ShowerHead, Snowflake, ThermometerSun, Trash2, UserRoundPlus, Wind } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, ClipboardPenLine, Flame, LocateFixed, MapPin, Plus, Search, ShowerHead, Snowflake, ThermometerSun, Trash2, UserRoundPlus, Wind } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Modal } from '../components/Modal'
 import { EntityDetailModal, type ProfileSubject } from '../components/EntityDetailModal'
@@ -73,7 +73,7 @@ export function Surveys() {
           const alreadyProject = projects.some((project) => project.surveyId === survey.id)
           return <div className="table-row" key={survey.id}>
             <span><span><strong>{survey.id}</strong><small>{new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short' }).format(new Date(survey.createdAt))} · {role === 'admin' && ownerUser && (ownerUser.role === 'usta' || ownerUser.role === 'proje') ? <button className="entity-name-link inline" onClick={() => setProfile({ kind: 'user', id: ownerUser.id })}>{survey.owner}</button> : survey.owner}</small></span></span>
-            <span><span>{role === 'admin' && customer ? <button className="entity-name-link" onClick={() => setProfile({ kind: 'customer', id: customer.id })}>{customer.name}</button> : <strong>{customer?.name}</strong>}<small>{customer?.district}</small></span></span>
+            <span><span>{role === 'admin' && customer ? <button className="entity-name-link" onClick={() => setProfile({ kind: 'customer', id: customer.id })}>{customer.name}</button> : <strong>{customer?.name}</strong>}<small>{survey.siteAddress ?? customer?.district}</small></span></span>
             <span><i className={`type-dot type-${survey.type === 'Doğalgaz' ? 'gas' : survey.type === 'Sıhhi Tesisat' ? 'water' : survey.type === 'Klima' ? 'ac' : 'heat'}`} /><span><strong>{survey.type}</strong><small>{survey.workItemKeys?.length ?? 0} iş kalemi</small></span></span>
             {!hidePrices && <span><strong>{formatCurrency(survey.total)}</strong></span>}
             <span>{canManage ? <select className="status-select" value={survey.status} onChange={(event) => updateSurvey({ ...survey, status: event.target.value as SurveyStatus })}>{statusOptions.map((status) => <option value={status} key={status}>{status}</option>)}</select> : <em className={`status-pill status-${survey.status.toLocaleLowerCase('tr-TR').replaceAll(' ', '-')}`}>{survey.status}</em>}</span>
@@ -93,11 +93,20 @@ export function Surveys() {
 function SurveyWizard({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { customers, products, templates, addCustomer, addSurvey, surveys, role } = useApp()
   const initialTemplate = templates.find((template) => template.type === 'Doğalgaz')
+  const initialCustomer = customers[0]
   const [step, setStep] = useState(1)
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? '')
   const [customerQuery, setCustomerQuery] = useState('')
   const [showNewCustomer, setShowNewCustomer] = useState(false)
   const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', district: '', address: '' })
+  const [site, setSite] = useState({
+    address: initialCustomer ? `${initialCustomer.address}${initialCustomer.district ? `, ${initialCustomer.district}` : ''}` : '',
+    contactName: initialCustomer?.name ?? '',
+    contactPhone: initialCustomer?.phone ?? '',
+    latitude: '',
+    longitude: '',
+  })
+  const [locationState, setLocationState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [type, setType] = useState<SurveyType>('Doğalgaz')
   const [templateId, setTemplateId] = useState(initialTemplate?.id ?? '')
   const [workItemKeys, setWorkItemKeys] = useState<string[]>(initialTemplate?.workItemKeys ?? [])
@@ -165,20 +174,50 @@ function SurveyWizard({ open, onClose }: { open: boolean; onClose: () => void })
     setWorkItemKeys((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key])
   }
   const resetAndClose = () => {
+    const customer = customers[0]
     setStep(1)
     chooseType('Doğalgaz')
     setRooms(createDefaultRooms())
+    setCustomerId(customer?.id ?? '')
+    setSite({ address: customer ? `${customer.address}${customer.district ? `, ${customer.district}` : ''}` : '', contactName: customer?.name ?? '', contactPhone: customer?.phone ?? '', latitude: '', longitude: '' })
     setCustomerQuery('')
     setShowNewCustomer(false)
+    setLocationState('idle')
     onClose()
+  }
+  const selectCustomer = (customer: typeof customers[number]) => {
+    setCustomerId(customer.id)
+    setSite({
+      address: `${customer.address}${customer.district ? `, ${customer.district}` : ''}`,
+      contactName: customer.name,
+      contactPhone: customer.phone,
+      latitude: '',
+      longitude: '',
+    })
+    setLocationState('idle')
   }
   const createCustomer = () => {
     if (!newCustomer.name.trim() || !newCustomer.phone.trim()) return
     const customer = addCustomer(newCustomer)
-    setCustomerId(customer.id)
+    selectCustomer(customer)
     setNewCustomer({ name: '', phone: '', district: '', address: '' })
     setCustomerQuery('')
     setShowNewCustomer(false)
+  }
+  const captureLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationState('error')
+      return
+    }
+    setLocationState('loading')
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setSite((current) => ({ ...current, latitude: position.coords.latitude.toFixed(6), longitude: position.coords.longitude.toFixed(6) }))
+        setLocationState('success')
+      },
+      () => setLocationState('error'),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+    )
   }
   const setQuantity = (productId: string, quantity: number) => setLines((current) => {
     const existing = current.find((line) => line.productId === productId)
@@ -209,20 +248,32 @@ function SurveyWizard({ open, onClose }: { open: boolean; onClose: () => void })
     }))
   }
   const save = () => {
-    addSurvey({ id: `KSF-${1045 + surveys.length}`, customerId, type, status: role === 'usta' ? 'Taslak' : 'Fiyatlandırıldı', rooms: hasRadiators ? rooms : [], lines: effectiveLines, templateId, workItemKeys, total: grandTotal, createdAt: new Date().toISOString().slice(0, 10), owner: role === 'usta' ? 'Mehmet Usta' : role === 'proje' ? 'Derya Çetin' : 'Zeynep Şahin' })
+    const latitude = site.latitude.trim() === '' ? undefined : Number(site.latitude)
+    const longitude = site.longitude.trim() === '' ? undefined : Number(site.longitude)
+    addSurvey({ id: `KSF-${1045 + surveys.length}`, customerId, type, status: role === 'usta' ? 'Taslak' : 'Fiyatlandırıldı', rooms: hasRadiators ? rooms : [], lines: effectiveLines, templateId, workItemKeys, total: grandTotal, createdAt: new Date().toISOString().slice(0, 10), owner: role === 'usta' ? 'Mehmet Usta' : role === 'proje' ? 'Derya Çetin' : 'Zeynep Şahin', siteAddress: site.address.trim(), siteContactName: site.contactName.trim(), siteContactPhone: site.contactPhone.trim(), latitude: Number.isFinite(latitude) ? latitude : undefined, longitude: Number.isFinite(longitude) ? longitude : undefined })
     resetAndClose()
   }
 
   return <Modal open={open} onClose={resetAndClose} eyebrow="HIZLI KEŞİF" title="Yeni keşif oluştur" wide>
     <div className="wizard-progress">{['Müşteri & tür', 'Şablon & işler', 'Seçimler & metraj', 'Teklif özeti'].map((label, index) => <div className={step >= index + 1 ? 'active' : ''} key={label}><span>{step > index + 1 ? <Check size={15} /> : index + 1}</span><strong>{label}</strong></div>)}</div>
     <div className="wizard-body">
-      {step === 1 && <div className="wizard-section"><div className="section-title"><span>01</span><div><h3>Müşteri ve keşif türü</h3><p>Mevcut müşteriyi bulun veya yeni müşteri oluşturun.</p></div></div><div className="customer-picker-head"><label><Search size={17} /><input value={customerQuery} onChange={(event) => setCustomerQuery(event.target.value)} placeholder="İsim, telefon veya ilçe ile müşteri ara…" /></label><button className="primary-button" onClick={() => setShowNewCustomer((value) => !value)}><UserRoundPlus size={17} /> Yeni Müşteri</button></div>{showNewCustomer && <div className="new-customer-inline"><label><span>Ad soyad *</span><input value={newCustomer.name} onChange={(event) => setNewCustomer({ ...newCustomer, name: event.target.value })} /></label><label><span>Telefon *</span><input value={newCustomer.phone} onChange={(event) => setNewCustomer({ ...newCustomer, phone: event.target.value })} /></label><label><span>İlçe</span><input value={newCustomer.district} onChange={(event) => setNewCustomer({ ...newCustomer, district: event.target.value })} /></label><label><span>Adres</span><input value={newCustomer.address} onChange={(event) => setNewCustomer({ ...newCustomer, address: event.target.value })} /></label><button disabled={!newCustomer.name.trim() || !newCustomer.phone.trim()} onClick={createCustomer}><Check size={16} /> Kaydet ve seç</button></div>}<div className="customer-results">{filteredCustomers.slice(0, 6).map((customer) => <button className={customerId === customer.id ? 'selected' : ''} onClick={() => setCustomerId(customer.id)} key={customer.id}><span>{customer.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</span><div><strong>{customer.name}</strong><small>{customer.phone} · {customer.district}</small></div>{customerId === customer.id && <Check size={16} />}</button>)}</div><span className="choice-label">YAPILACAK KEŞİF İŞLEMİ</span><div className="type-choice-grid four">{typeOptions.map(({ value, description, icon: Icon, className }) => <button className={type === value ? 'selected' : ''} onClick={() => chooseType(value)} key={value}><span className={`type-icon ${className}`}><Icon /></span><strong>{value}</strong><small>{description}</small><i>{type === value && <Check size={14} />}</i></button>)}</div></div>}
+      {step === 1 && <div className="wizard-section"><div className="section-title"><span>01</span><div><h3>Müşteri ve keşif türü</h3><p>Ödeme müşterisini ve uygulamanın yapılacağı yeri ayrı kaydedin.</p></div></div><div className="customer-picker-head"><label><Search size={17} /><input value={customerQuery} onChange={(event) => setCustomerQuery(event.target.value)} placeholder="İsim, telefon veya ilçe ile müşteri ara…" /></label><button className="primary-button" onClick={() => setShowNewCustomer((value) => !value)}><UserRoundPlus size={17} /> Yeni Müşteri</button></div>{showNewCustomer && <div className="new-customer-inline"><label><span>Ad soyad *</span><input value={newCustomer.name} onChange={(event) => setNewCustomer({ ...newCustomer, name: event.target.value })} /></label><label><span>Telefon *</span><input value={newCustomer.phone} onChange={(event) => setNewCustomer({ ...newCustomer, phone: event.target.value })} /></label><label><span>İlçe</span><input value={newCustomer.district} onChange={(event) => setNewCustomer({ ...newCustomer, district: event.target.value })} /></label><label><span>Adres</span><input value={newCustomer.address} onChange={(event) => setNewCustomer({ ...newCustomer, address: event.target.value })} /></label><button disabled={!newCustomer.name.trim() || !newCustomer.phone.trim()} onClick={createCustomer}><Check size={16} /> Kaydet ve seç</button></div>}<div className="customer-results">{filteredCustomers.slice(0, 6).map((customer) => <button className={customerId === customer.id ? 'selected' : ''} onClick={() => selectCustomer(customer)} key={customer.id}><span>{customer.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</span><div><strong>{customer.name}</strong><small>{customer.phone} · {customer.district}</small></div>{customerId === customer.id && <Check size={16} />}</button>)}</div><SiteDetailsEditor site={site} setSite={setSite} locationState={locationState} captureLocation={captureLocation} /><span className="choice-label">YAPILACAK KEŞİF İŞLEMİ</span><div className="type-choice-grid four">{typeOptions.map(({ value, description, icon: Icon, className }) => <button className={type === value ? 'selected' : ''} onClick={() => chooseType(value)} key={value}><span className={`type-icon ${className}`}><Icon /></span><strong>{value}</strong><small>{description}</small><i>{type === value && <Check size={14} />}</i></button>)}</div></div>}
       {step === 2 && <div className="wizard-section"><div className="section-title"><span>02</span><div><h3>Şablon ve yapılacak işler</h3><p>Şablon başlangıç seçimini yapar; aşağıdaki kalemleri serbestçe değiştirebilirsiniz.</p></div></div><label className="template-select"><span>Hazır şablon</span><select value={templateId} onChange={(event) => chooseTemplate(event.target.value)}>{typeTemplates.map((template) => <option value={template.id} key={template.id}>{template.name}</option>)}</select><small>{selectedTemplate?.workItemKeys.length ?? 0} hazır iş kalemi</small></label><div className="work-item-grid">{typeWorkItems.map((item) => <button className={workItemKeys.includes(item.key) ? 'selected' : ''} onClick={() => toggleWorkItem(item.key)} key={item.key}><span>{workItemKeys.includes(item.key) && <Check size={14} />}</span><div><strong>{item.label}</strong><small>{item.description}</small></div></button>)}</div><p className="template-note">Seçimler bu keşfe özeldir; şablonun aslı değişmez. Kalıcı şablon düzenlemelerini “Ürün & fiyatlar” ekranından yapabilirsiniz.</p></div>}
       {step === 3 && <div className="wizard-section"><div className="section-title"><span>03</span><div><h3>Ürün, ölçü ve metrajlar</h3><p>Seçili iş kalemlerinin ürünlerini ve miktarlarını belirleyin.</p></div></div>{workItemKeys.includes('kombi') && <DeviceSelector title="Kombi" hint="Marka ve kapasite" icon={<Flame size={19} />} products={boilerProducts} selected={selectedBoiler} onSelect={(id) => setBoilerProductId(id)} hidePrices={hidePrices} />}{workItemKeys.includes('isi-pompasi') && <DeviceSelector title="Isı pompası" hint="Marka ve kapasite" icon={<Wind size={19} />} products={heatPumpProducts} selected={selectedHeatPump} onSelect={(id) => setHeatPumpProductId(id)} hidePrices={hidePrices} />}{workItemKeys.includes('klima') && <DeviceSelector title="Klima" hint="Marka ve BTU gücü" icon={<Snowflake size={19} />} products={acProducts} selected={selectedAc} onSelect={(id) => setAcProductId(id)} hidePrices={hidePrices} />}{hasRadiators && <RoomRadiators rooms={rooms} products={radiatorProducts} defaultBrand={defaultRadiatorBrand} onDefaultBrandChange={changeDefaultRadiatorBrand} hidePrices={hidePrices} addingRoom={addingRoom} newRoomName={newRoomName} setAddingRoom={setAddingRoom} setNewRoomName={setNewRoomName} addRoom={addRoom} updateRoom={updateRoom} selectPart={selectRadiatorPart} removeRoom={(id) => setRooms((current) => current.filter((room) => room.id !== id))} />} {availableProducts.length > 0 && <><span className="choice-label">MALZEME, METRAJ VE İŞÇİLİK</span><div className="product-picker">{availableProducts.map((product) => { const line = lines.find((item) => item.productId === product.id); return <div className={`picker-row ${hidePrices ? 'without-price' : ''}`} key={product.id}><div><span>{product.code}</span><strong>{product.name}</strong><small>{product.variant ?? product.unit}{!hidePrices && ` · ${formatCurrency(product.sale)} / ${product.unit}`}</small></div><div className="quantity-input"><button onClick={() => setQuantity(product.id, (line?.quantity ?? 0) - 1)}>−</button><input type="number" min="0" value={line?.quantity ?? 0} onChange={(event) => setQuantity(product.id, Number(event.target.value))} /><button onClick={() => setQuantity(product.id, (line?.quantity ?? 0) + 1)}>+</button><small>{product.unit}</small></div>{!hidePrices && <b>{formatCurrency((line?.quantity ?? 0) * product.sale)}</b>}</div> })}</div></>}<div className="inline-total"><span>{effectiveLines.length} malzeme/hizmet satırı</span>{!hidePrices && <><span>Alış toplamı {formatCurrency(totals.cost)}</span><strong>Satış toplamı {formatCurrency(totals.sale)}</strong></>}</div></div>}
-      {step === 4 && <div className={`summary-grid ${hidePrices ? 'no-price-summary' : ''}`}><div className="quote-summary"><div className="section-title"><span>04</span><div><h3>Keşif ve teklif özeti</h3><p>Kaydetmeden önce bilgileri kontrol edin.</p></div></div><dl><div><dt>Müşteri</dt><dd>{customers.find((item) => item.id === customerId)?.name}</dd></div><div><dt>Keşif</dt><dd>{type} · {selectedTemplate?.name}</dd></div><div><dt>Yapılacak işler</dt><dd>{workItemKeys.length} kalem</dd></div><div><dt>Malzeme/hizmet</dt><dd>{effectiveLines.length} satır</dd></div>{hasRadiators && <div><dt>Radyatörler</dt><dd>{rooms.filter((room) => room.radiatorProductId).length} oda</dd></div>}</dl><div className="selected-work-tags">{workItemKeys.map((key) => <span key={key}>{workItemDefinitions.find((item) => item.key === key)?.label}</span>)}</div>{hidePrices && <div className="master-price-note">Usta görünümünde fiyatlar gizlidir. Keşif yönetici fiyatlandırması için taslak kaydedilir.</div>}</div>{!hidePrices && <div className="price-card"><span>TEKLİF HESABI</span><div><small>Satış tutarı</small><strong>{formatCurrency(totals.sale)}</strong></div><div><small>KDV (%20)</small><strong>{formatCurrency(vat)}</strong></div><hr /><div className="grand-total"><small>Genel toplam</small><strong>{formatCurrency(grandTotal)}</strong></div><p>Alış: <b>{formatCurrency(totals.cost)}</b> · Brüt kâr: <b>{formatCurrency(totals.sale - totals.cost)}</b></p></div>}</div>}
+      {step === 4 && <div className={`summary-grid ${hidePrices ? 'no-price-summary' : ''}`}><div className="quote-summary"><div className="section-title"><span>04</span><div><h3>Keşif ve teklif özeti</h3><p>Kaydetmeden önce bilgileri kontrol edin.</p></div></div><dl><div><dt>Ödeme müşterisi</dt><dd>{customers.find((item) => item.id === customerId)?.name}</dd></div><div><dt>Uygulama adresi</dt><dd>{site.address}</dd></div><div><dt>Saha iletişimi</dt><dd>{site.contactName} · {site.contactPhone}</dd></div><div><dt>Konum</dt><dd>{site.latitude && site.longitude ? `${site.latitude}, ${site.longitude}` : 'Adres kullanılacak'}</dd></div><div><dt>Keşif</dt><dd>{type} · {selectedTemplate?.name}</dd></div><div><dt>Yapılacak işler</dt><dd>{workItemKeys.length} kalem</dd></div><div><dt>Malzeme/hizmet</dt><dd>{effectiveLines.length} satır</dd></div>{hasRadiators && <div><dt>Radyatörler</dt><dd>{rooms.filter((room) => room.radiatorProductId).length} oda</dd></div>}</dl><div className="selected-work-tags">{workItemKeys.map((key) => <span key={key}>{workItemDefinitions.find((item) => item.key === key)?.label}</span>)}</div>{hidePrices && <div className="master-price-note">Usta görünümünde fiyatlar gizlidir. Keşif yönetici fiyatlandırması için taslak kaydedilir.</div>}</div>{!hidePrices && <div className="price-card"><span>TEKLİF HESABI</span><div><small>Satış tutarı</small><strong>{formatCurrency(totals.sale)}</strong></div><div><small>KDV (%20)</small><strong>{formatCurrency(vat)}</strong></div><hr /><div className="grand-total"><small>Genel toplam</small><strong>{formatCurrency(grandTotal)}</strong></div><p>Alış: <b>{formatCurrency(totals.cost)}</b> · Brüt kâr: <b>{formatCurrency(totals.sale - totals.cost)}</b></p></div>}</div>}
     </div>
-    <footer className="wizard-footer"><button className="secondary-button" onClick={() => step === 1 ? resetAndClose() : setStep((value) => value - 1)}>{step > 1 && <ArrowLeft size={17} />}{step === 1 ? 'Vazgeç' : 'Geri'}</button>{step < 4 ? <button className="primary-button" disabled={!customerId || (step === 2 && workItemKeys.length === 0) || (step === 3 && effectiveLines.length === 0)} onClick={() => setStep((value) => value + 1)}>Devam et <ArrowRight size={17} /></button> : <button className="primary-button" onClick={save}><Check size={17} /> Keşfi kaydet</button>}</footer>
+    <footer className="wizard-footer"><button className="secondary-button" onClick={() => step === 1 ? resetAndClose() : setStep((value) => value - 1)}>{step > 1 && <ArrowLeft size={17} />}{step === 1 ? 'Vazgeç' : 'Geri'}</button>{step < 4 ? <button className="primary-button" disabled={!customerId || (step === 1 && (!site.address.trim() || !site.contactName.trim() || !site.contactPhone.trim())) || (step === 2 && workItemKeys.length === 0) || (step === 3 && effectiveLines.length === 0)} onClick={() => setStep((value) => value + 1)}>Devam et <ArrowRight size={17} /></button> : <button className="primary-button" onClick={save}><Check size={17} /> Keşfi kaydet</button>}</footer>
   </Modal>
+}
+
+type SiteState = { address: string; contactName: string; contactPhone: string; latitude: string; longitude: string }
+
+function SiteDetailsEditor({ site, setSite, locationState, captureLocation }: { site: SiteState; setSite: (site: SiteState) => void; locationState: 'idle' | 'loading' | 'success' | 'error'; captureLocation: () => void }) {
+  return <section className="survey-site-card">
+    <header><div><MapPin size={18} /><span><strong>Keşif ve uygulama noktası</strong><small>Ödeme müşterisinden bağımsız saha bilgileri</small></span></div><button type="button" onClick={captureLocation} disabled={locationState === 'loading'}><LocateFixed size={16} /> {locationState === 'loading' ? 'Konum alınıyor…' : locationState === 'success' ? 'Konum güncellendi' : 'Yerinde konum al'}</button></header>
+    <div className="site-form-grid"><label className="site-address"><span>Keşif / uygulama adresi *</span><input value={site.address} onChange={(event) => setSite({ ...site, address: event.target.value })} placeholder="Mahalle, sokak, bina ve daire" /></label><label><span>İletişim kişisi *</span><input value={site.contactName} onChange={(event) => setSite({ ...site, contactName: event.target.value })} placeholder="Örn. Kiracı adı" /></label><label><span>İletişim telefonu *</span><input value={site.contactPhone} onChange={(event) => setSite({ ...site, contactPhone: event.target.value })} placeholder="05xx xxx xx xx" /></label><label><span>Enlem</span><input type="number" step="any" value={site.latitude} onChange={(event) => setSite({ ...site, latitude: event.target.value })} placeholder="39.776700" /></label><label><span>Boylam</span><input type="number" step="any" value={site.longitude} onChange={(event) => setSite({ ...site, longitude: event.target.value })} placeholder="30.520600" /></label></div>
+    <p className={`location-feedback ${locationState}`}>{locationState === 'success' ? 'Konum başarıyla alındı. İsterseniz koordinatları elle düzeltebilirsiniz.' : locationState === 'error' ? 'Konum alınamadı veya izin verilmedi. Enlem ve boylamı elle girebilir ya da yalnızca adresi kullanabilirsiniz.' : 'Konum izni verilirse GPS koordinatları kaydedilir. Konum zorunlu değildir; adresle de yol tarifi alınabilir.'}</p>
+  </section>
 }
 
 function DeviceSelector({ title, hint, icon, products, selected, onSelect, hidePrices }: { title: string; hint: string; icon: React.ReactNode; products: Product[]; selected?: Product; onSelect: (id: string) => void; hidePrices: boolean }) {

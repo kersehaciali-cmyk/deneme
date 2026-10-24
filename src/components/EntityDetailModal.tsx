@@ -10,7 +10,7 @@ const roleLabels = { admin: 'Yönetici', usta: 'Usta', proje: 'Proje takipçisi'
 const formatDate = (value?: string) => value ? new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${value}T12:00:00`)) : 'Belirlenmedi'
 
 export function EntityDetailModal({ subject, onClose }: { subject: ProfileSubject | null; onClose: () => void }) {
-  const { customers, users, projects, payments } = useApp()
+  const { customers, users, projects, surveys, payments } = useApp()
   const customer = subject?.kind === 'customer' ? customers.find((item) => item.id === subject.id) : undefined
   const user = subject?.kind === 'user' ? users.find((item) => item.id === subject.id) : undefined
   const relatedProjects = useMemo(() => sortProjectsNewestFirst(projects.filter((project) => {
@@ -55,13 +55,18 @@ export function EntityDetailModal({ subject, onClose }: { subject: ProfileSubjec
         <header><div><span className="eyebrow">PROJE GEÇMİŞİ</span><h3>Projeler</h3></div><small>En yeniden eskiye</small></header>
         {relatedProjects.length === 0 ? <div className="entity-empty">Bu kişiye bağlı proje bulunmuyor.</div> : <div className="entity-project-list">{relatedProjects.map((project) => {
           const projectCustomer = customers.find((item) => item.id === project.customerId)
+          const survey = surveys.find((item) => item.id === project.surveyId)
           const master = users.find((item) => item.id === project.assignedMasterId)
           const closed = isProjectClosed(project)
           const currentStage = project.stages[Math.min(project.currentStage, project.stages.length - 1)]
+          const siteAddress = project.siteAddress ?? survey?.siteAddress ?? (projectCustomer ? `${projectCustomer.address}, ${projectCustomer.district}` : 'Adres girilmedi')
+          const siteContactName = project.siteContactName ?? survey?.siteContactName ?? projectCustomer?.name
+          const siteContactPhone = project.siteContactPhone ?? survey?.siteContactPhone ?? projectCustomer?.phone
           return <article key={project.id}>
             <div className="entity-project-main"><span className={`project-type project-${project.type === 'Doğalgaz' ? 'gas' : project.type === 'Isı Pompası' ? 'heat' : project.type === 'Klima' ? 'ac' : 'water'}`}>{project.type}</span><div><strong>{project.id} · {projectCustomer?.name}</strong><small><CalendarDays size={12} /> Kayıt: {formatDate(project.createdAt ?? project.applicationDate)} · Uygulama: {formatDate(project.applicationDate)}</small></div></div>
             <em className={`project-state ${closed ? 'closed' : 'open'}`}>{closed ? 'Kapalı' : 'Açık'}</em>
             <div className="entity-project-stage"><span><b>Güncel aşama:</b> {currentStage}</span><span><b>Usta:</b> {master?.name ?? 'Atanmadı'}</span><span><b>Takipçi:</b> {project.owner}</span></div>
+            <div className="entity-project-site"><span><MapPin size={12} /> {siteAddress}</span><span><Phone size={12} /> {siteContactName}{siteContactPhone && ` · ${siteContactPhone}`}</span></div>
             <div className="entity-project-progress"><span style={{ width: `${projectProgress(project.currentStage, project.stages.length)}%` }} /></div>
           </article>
         })}</div>}

@@ -15,8 +15,15 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageKey) => void 
   const outstanding = payments.reduce((sum, payment) => sum + payment.amount - payment.paid, 0)
   const completedJobs = jobs.filter((job) => job.status === 'Tamamlandı').length
   const activeProjects = projects.filter((project) => project.currentStage < project.stages.length - 1).length
+  const recentSurveys = [...surveys].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 3)
+  const completedJobList = jobs.filter((job) => job.status === 'Tamamlandı').sort((a, b) => b.appointment.localeCompare(a.appointment)).slice(0, 3)
+  const approvalProjects = projects.filter((project) => project.stages[project.currentStage]?.toLocaleLowerCase('tr-TR').includes('onaya gönderildi')).slice(0, 3)
   const isCustomer = role === 'musteri'
   const isMaster = role === 'usta'
+  const openFilteredList = (page: 'jobs' | 'projects', filter: string) => {
+    sessionStorage.setItem('tesisat-pro-list-filter', `${page}:${filter}`)
+    onNavigate(page)
+  }
 
   return (
     <div className="page-stack">
@@ -73,6 +80,12 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageKey) => void 
           </button>
         </article>
       </section>
+
+      {!isCustomer && <section className="operations-lists">
+        <article className="panel operations-list-card"><header><div><ClipboardPlus /><span><strong>Keşif listesi</strong><small>Son oluşturulan keşifler</small></span></div><button onClick={() => onNavigate('surveys')}>Tümünü gör <ArrowRight size={14} /></button></header><div>{recentSurveys.map((survey) => { const customer = customers.find((item) => item.id === survey.customerId); return <button className="operations-list-row" onClick={() => onNavigate('surveys')} key={survey.id}><span><strong>{survey.id} · {customer?.name}</strong><small>{survey.type} · {survey.status}</small></span><ArrowRight size={14} /></button> })}{recentSurveys.length === 0 && <p>Keşif bulunmuyor.</p>}</div></article>
+        <article className="panel operations-list-card"><header><div><CheckCircle2 /><span><strong>Biten iş listesi</strong><small>Tamamlanan saha işleri</small></span></div><button onClick={() => openFilteredList('jobs', 'completed')}>Tümünü gör <ArrowRight size={14} /></button></header><div>{completedJobList.map((job) => { const customer = customers.find((item) => item.id === job.customerId); return <button className="operations-list-row" onClick={() => openFilteredList('jobs', 'completed')} key={job.id}><span><strong>{job.id} · {customer?.name}</strong><small>{job.title} · {formatDay(job.appointment)} {formatWeekday(job.appointment)}</small></span><ArrowRight size={14} /></button> })}{completedJobList.length === 0 && <p>Biten iş bulunmuyor.</p>}</div></article>
+        <article className="panel operations-list-card"><header><div><Clock3 /><span><strong>Proje onayı bekleyenler</strong><small>Onaya gönderilmiş projeler</small></span></div><button onClick={() => openFilteredList('projects', 'approval')}>Tümünü gör <ArrowRight size={14} /></button></header><div>{approvalProjects.map((project) => { const customer = customers.find((item) => item.id === project.customerId); return <button className="operations-list-row" onClick={() => openFilteredList('projects', 'approval')} key={project.id}><span><strong>{project.id} · {customer?.name}</strong><small>{project.type} · {project.stages[project.currentStage]}</small></span><ArrowRight size={14} /></button> })}{approvalProjects.length === 0 && <p>Onay bekleyen proje bulunmuyor.</p>}</div></article>
+      </section>}
 
       {!isCustomer && <section className="panel performance-panel">
         <div className="panel-heading">

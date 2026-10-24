@@ -199,6 +199,7 @@ export const seedTemplates: SurveyTemplate[] = [
 export const seedSurveys: Survey[] = [
   {
     id: 'KSF-1042', customerId: 'mus-001', type: 'Doğalgaz', status: 'Onaylandı', owner: 'Emre Arslan', createdAt: '2026-10-18', total: 84650,
+    siteAddress: 'Yenibağlar Mah. Üniversite Cad. No: 18/6, Tepebaşı', siteContactName: 'Ayşe Yılmaz', siteContactPhone: '0532 444 12 18', latitude: 39.7767, longitude: 30.5206,
     templateId: 'tpl-dg-daire', workItemKeys: ['gaz-hatti', 'kombi', 'radyator-dg', 'boru-dg', 'ek-baca'],
     rooms: [
       { id: 'r1', name: 'Salon', radiatorProductId: 'rad-1-4' },
@@ -226,7 +227,7 @@ export const seedSurveys: Survey[] = [
 
 export const seedJobs: Job[] = [
   {
-    id: 'IS-284', customerId: 'mus-001', title: 'Kombi ve radyatör montajı', assignee: 'Mehmet Usta', appointment: '2026-10-25', status: 'Hazırlanıyor',
+    id: 'IS-284', customerId: 'mus-001', projectId: 'PRJ-090', title: 'Kombi ve radyatör montajı', assignee: 'Mehmet Usta', appointment: '2026-10-25', status: 'Hazırlanıyor', siteAddress: 'Yenibağlar Mah. Üniversite Cad. No: 18/6, Tepebaşı', siteContactName: 'Ayşe Yılmaz', siteContactPhone: '0532 444 12 18', latitude: 39.7767, longitude: 30.5206,
     checklist: [
       { id: 'c1', label: '24 kW kombi', done: true },
       { id: 'c2', label: '7,5 m panel radyatör', done: true },
@@ -254,7 +255,7 @@ export const plumbingStages = ['Uygulama Planlandı', 'Malzeme Hazırlandı', 'U
 export const acStages = ['Uygulama Planlandı', 'Klima Montajı', 'Vakum ve Test', 'Devreye Alındı']
 
 export const seedProjects: Project[] = [
-  { id: 'PRJ-090', customerId: 'mus-001', type: 'Doğalgaz', createdAt: '2026-10-23', currentStage: 4, stages: gasStages, owner: 'Derya Çetin', ownerId: 'usr-004', dueDate: '2026-11-08', surveyId: 'KSF-1042', assignedMasterId: 'usr-002', applicationDate: '2026-10-25', materials: [{ id: 'mat-1', productId: 'kmb-1-24', label: 'Baymak Yoğuşmalı Kombi 24 kW', quantity: 1, unit: 'adet', prepared: true }, { id: 'mat-2', productId: 'dg-hat-celik', label: 'Çelik Gaz Hattı', quantity: 18, unit: 'metre', prepared: false }], attachments: [], adminApproved: false },
+  { id: 'PRJ-090', customerId: 'mus-001', type: 'Doğalgaz', createdAt: '2026-10-23', currentStage: 4, stages: gasStages, owner: 'Derya Çetin', ownerId: 'usr-004', dueDate: '2026-11-08', surveyId: 'KSF-1042', assignedMasterId: 'usr-002', applicationDate: '2026-10-25', siteAddress: 'Yenibağlar Mah. Üniversite Cad. No: 18/6, Tepebaşı', siteContactName: 'Ayşe Yılmaz', siteContactPhone: '0532 444 12 18', latitude: 39.7767, longitude: 30.5206, materials: [{ id: 'mat-1', productId: 'kmb-1-24', label: 'Baymak Yoğuşmalı Kombi 24 kW', quantity: 1, unit: 'adet', prepared: true }, { id: 'mat-2', productId: 'dg-hat-celik', label: 'Çelik Gaz Hattı', quantity: 18, unit: 'metre', prepared: false }], attachments: [], adminApproved: false },
   { id: 'PRJ-091', customerId: 'mus-004', type: 'Isı Pompası', createdAt: '2026-10-24', currentStage: 2, stages: heatPumpStages, owner: 'Selin Akın', ownerId: 'usr-005', dueDate: '2026-11-18' },
   { id: 'PRJ-087', customerId: 'mus-002', type: 'Sıhhi Tesisat', createdAt: '2026-10-18', currentStage: 3, stages: plumbingStages, owner: 'Derya Çetin', ownerId: 'usr-004', dueDate: '2026-10-29' },
 ]

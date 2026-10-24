@@ -49,6 +49,11 @@ export interface Survey {
   total: number
   createdAt: string
   owner: string
+  siteAddress?: string
+  siteContactName?: string
+  siteContactPhone?: string
+  latitude?: number
+  longitude?: number
 }
 
 export interface Product {
@@ -95,11 +100,17 @@ export interface ChecklistItem {
 export interface Job {
   id: string
   customerId: string
+  projectId?: string
   title: string
   assignee: string
   appointment: string
   status: 'Planlandı' | 'Hazırlanıyor' | 'Hazır' | 'Yolda' | 'Başladı' | 'Tamamlandı'
   checklist: ChecklistItem[]
+  siteAddress?: string
+  siteContactName?: string
+  siteContactPhone?: string
+  latitude?: number
+  longitude?: number
 }
 
 export interface Project {
@@ -118,6 +129,11 @@ export interface Project {
   materials?: ProjectMaterial[]
   attachments?: ProjectAttachment[]
   adminApproved?: boolean
+  siteAddress?: string
+  siteContactName?: string
+  siteContactPhone?: string
+  latitude?: number
+  longitude?: number
 }
 
 export interface ProjectMaterial {

@@ -1,18 +1,28 @@
-import { CalendarClock, Camera, Check, ChevronDown, ChevronRight, FileCheck2, FileSpreadsheet, Image, PackageCheck, Plus, Printer, Trash2, UserRound, Video } from 'lucide-react'
+import { CalendarClock, Camera, Check, ChevronDown, ChevronRight, FileCheck2, FileSpreadsheet, Image, MapPin, Navigation, PackageCheck, Phone, Plus, Printer, Trash2, UserRound, Video } from 'lucide-react'
 import { useState, type ChangeEvent } from 'react'
 import { EntityDetailModal, type ProfileSubject } from '../components/EntityDetailModal'
 import { useApp } from '../context/AppContext'
-import { projectProgress } from '../lib/domain'
+import { directionsUrl, isProjectClosed, projectProgress, sortProjectsNewestFirst } from '../lib/domain'
 import type { Project, ProjectMaterial } from '../types'
 
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character] ?? character)
 
 export function Projects() {
-  const { projects, customers, users, updateProject, role } = useApp()
+  const { projects, customers, users, surveys, updateProject, role } = useApp()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [profile, setProfile] = useState<ProfileSubject | null>(null)
+  const [filter, setFilter] = useState<'all' | 'open' | 'approval' | 'closed'>(() => {
+    const requested = sessionStorage.getItem('tesisat-pro-list-filter')
+    if (requested === 'projects:approval') {
+      sessionStorage.removeItem('tesisat-pro-list-filter')
+      return 'approval'
+    }
+    return 'all'
+  })
   const [newMaterial, setNewMaterial] = useState({ label: '', quantity: 1, unit: 'adet' })
-  const visible = role === 'musteri' ? projects.filter((project) => project.customerId === 'mus-001') : role === 'usta' ? projects.filter((project) => project.assignedMasterId === 'usr-002') : projects
+  const roleProjects = role === 'musteri' ? projects.filter((project) => project.customerId === 'mus-001') : role === 'usta' ? projects.filter((project) => project.assignedMasterId === 'usr-002') : projects
+  const isApprovalWaiting = (project: Project) => project.stages[project.currentStage]?.toLocaleLowerCase('tr-TR').includes('onaya gönderildi') ?? false
+  const visible = sortProjectsNewestFirst(roleProjects.filter((project) => filter === 'all' || (filter === 'open' && !isProjectClosed(project)) || (filter === 'closed' && isProjectClosed(project)) || (filter === 'approval' && isApprovalWaiting(project))))
 
   const updateMaterial = (project: Project, material: ProjectMaterial) => updateProject({ ...project, materials: (project.materials ?? []).map((item) => item.id === material.id ? material : item) })
   const addMaterial = (project: Project) => {
@@ -46,26 +56,32 @@ export function Projects() {
   }
 
   return <div className="page-stack">
-    <section className="page-title-row"><div><span className="eyebrow">UÇTAN UCA UYGULAMA</span><h1>Proje ve iş takibi</h1><p>Uygulama, malzeme, saha kanıtları ve resmi kurum süreçlerini birlikte yönetin.</p></div></section>
+    <section className="page-title-row"><div><span className="eyebrow">UÇTAN UCA UYGULAMA</span><h1>Proje ve iş takibi</h1><p>Uygulama, malzeme, saha kanıtları ve resmi kurum süreçlerini birlikte yönetin.</p></div><div className="segmented project-filters"><button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>Tümü</button><button className={filter === 'open' ? 'active' : ''} onClick={() => setFilter('open')}>Açık</button><button className={filter === 'approval' ? 'active' : ''} onClick={() => setFilter('approval')}>Onay bekleyen</button><button className={filter === 'closed' ? 'active' : ''} onClick={() => setFilter('closed')}>Biten</button></div></section>
     <section className="project-list">{visible.map((project) => {
       const customer = customers.find((item) => item.id === project.customerId)
+      const survey = surveys.find((item) => item.id === project.surveyId)
       const master = users.find((user) => user.id === project.assignedMasterId)
       const manager = users.find((user) => user.id === project.ownerId) ?? users.find((user) => user.role === 'proje' && user.name === project.owner)
       const complete = project.currentStage === project.stages.length - 1
       const expanded = expandedId === project.id
       const preparedCount = (project.materials ?? []).filter((item) => item.prepared).length
       const canAdvance = role === 'admin' || role === 'proje' || (role === 'usta' && project.currentStage === 0)
+      const siteAddress = project.siteAddress ?? survey?.siteAddress ?? (customer ? `${customer.address}, ${customer.district}` : '')
+      const siteContactName = project.siteContactName ?? survey?.siteContactName ?? customer?.name
+      const siteContactPhone = project.siteContactPhone ?? survey?.siteContactPhone ?? customer?.phone
+      const routeUrl = directionsUrl(project.latitude ?? survey?.latitude, project.longitude ?? survey?.longitude, siteAddress)
       return <article className="project-card panel" key={project.id}>
         <header><div><span className={`project-type project-${project.type === 'Doğalgaz' ? 'gas' : project.type === 'Isı Pompası' ? 'heat' : project.type === 'Klima' ? 'ac' : 'water'}`}>{project.type}</span>{role === 'admin' && customer ? <button className="entity-name-link project-customer-link" onClick={() => setProfile({ kind: 'customer', id: customer.id })}>{customer.name}</button> : <h3>{customer?.name}</h3>}<p>{project.id}{project.surveyId && ` · ${project.surveyId}`} · {customer?.district}</p></div><div className="project-progress-number"><strong>%{projectProgress(project.currentStage, project.stages.length)}</strong><span>tamamlandı</span></div></header>
         <div className="project-progress"><span style={{ width: `${projectProgress(project.currentStage, project.stages.length)}%` }} /></div>
         <div className="stage-track" style={{ gridTemplateColumns: `repeat(${project.stages.length}, minmax(70px, 1fr))` }}>{project.stages.map((stage, index) => <div className={index < project.currentStage ? 'done' : index === project.currentStage ? 'current' : ''} key={stage}><span>{index < project.currentStage ? <Check size={13} /> : index + 1}</span><small>{stage}</small></div>)}</div>
+        <div className="project-site-info"><div><MapPin size={17} /><span>Uygulama adresi<strong>{siteAddress || 'Adres girilmedi'}</strong></span></div><div><Phone size={17} /><span>Randevu kişisi<strong>{siteContactName ?? 'Belirlenmedi'}{siteContactPhone && ` · ${siteContactPhone}`}</strong></span></div><button disabled={!routeUrl} onClick={() => routeUrl && window.open(routeUrl, '_blank', 'noopener,noreferrer')}><Navigation size={16} /> Yol tarifi al</button></div>
         <footer><div><UserRound size={16} /><span>Usta{role === 'admin' && master ? <button className="entity-name-link compact" onClick={() => setProfile({ kind: 'user', id: master.id })}>{master.name}</button> : <strong>{master?.name ?? 'Atanmadı'}</strong>}</span></div><div><UserRound size={16} /><span>Proje takipçisi{role === 'admin' && manager ? <button className="entity-name-link compact" onClick={() => setProfile({ kind: 'user', id: manager.id })}>{manager.name}</button> : <strong>{project.owner}</strong>}</span></div><div><CalendarClock size={16} /><span>Uygulama günü<strong>{project.applicationDate ? new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${project.applicationDate}T12:00:00`)) : 'Belirlenmedi'}</strong></span></div><div><PackageCheck size={16} /><span>Malzemeler<strong>{preparedCount}/{project.materials?.length ?? 0} hazır</strong></span></div>{!complete && canAdvance && <button onClick={() => updateProject({ ...project, currentStage: project.currentStage + 1 })}>{role === 'usta' ? 'Uygulama tamamlandı' : 'Aşamayı tamamla'} <ChevronRight size={16} /></button>}<button className="project-detail-toggle" onClick={() => setExpandedId(expanded ? null : project.id)}>Detaylar <ChevronDown size={15} /></button></footer>
         {expanded && <div className="project-detail-panel">
           <section className="material-editor"><div className="detail-section-head"><div><span className="eyebrow">MALZEME LİSTESİ</span><h4>Düzenle ve dışa aktar</h4></div><div><button onClick={() => printPdf(project)}><Printer size={15} /> PDF</button><button onClick={() => exportExcel(project)}><FileSpreadsheet size={15} /> Excel</button></div></div><div className="material-list">{(project.materials ?? []).map((material) => <div key={material.id}><button className={`material-check ${material.prepared ? 'checked' : ''}`} onClick={() => updateMaterial(project, { ...material, prepared: !material.prepared })}>{material.prepared && <Check size={13} />}</button><input value={material.label} onChange={(event) => updateMaterial(project, { ...material, label: event.target.value })} /><input type="number" min="0" value={material.quantity} onChange={(event) => updateMaterial(project, { ...material, quantity: Number(event.target.value) })} /><input value={material.unit} onChange={(event) => updateMaterial(project, { ...material, unit: event.target.value })} /><button className="delete-material" onClick={() => removeMaterial(project, material.id)}><Trash2 size={14} /></button></div>)}</div>{role !== 'musteri' && <div className="add-material-row"><input value={newMaterial.label} onChange={(event) => setNewMaterial({ ...newMaterial, label: event.target.value })} placeholder="Yeni malzeme" /><input type="number" value={newMaterial.quantity} onChange={(event) => setNewMaterial({ ...newMaterial, quantity: Number(event.target.value) })} /><input value={newMaterial.unit} onChange={(event) => setNewMaterial({ ...newMaterial, unit: event.target.value })} /><button onClick={() => addMaterial(project)}><Plus size={14} /> Ekle</button></div>}</section>
           <section className="evidence-editor"><div className="detail-section-head"><div><span className="eyebrow">SAHA KANITLARI</span><h4>Fotoğraf ve videolar</h4></div>{role !== 'musteri' && <label className="upload-button"><Camera size={15} /> Görsel ekle<input type="file" accept="image/*,video/*" multiple onChange={(event) => upload(project, event)} /></label>}</div>{(project.attachments ?? []).length === 0 ? <div className="empty-evidence"><Image size={25} /><span>Henüz fotoğraf veya video eklenmedi.</span></div> : <div className="attachment-grid">{project.attachments?.map((attachment) => <article key={attachment.id}>{attachment.type === 'image' ? <Image size={22} /> : <Video size={22} />}<div><strong>{attachment.name}</strong><small>{attachment.addedBy}</small></div>{attachment.approved ? <em><Check size={12} /> Onaylandı</em> : role === 'admin' ? <button onClick={() => updateProject({ ...project, attachments: project.attachments?.map((item) => item.id === attachment.id ? { ...item, approved: true } : item) })}>Onayla</button> : <em>Onay bekliyor</em>}</article>)}</div>}{role === 'admin' && <button className={`admin-approval ${project.adminApproved ? 'approved' : ''}`} onClick={() => updateProject({ ...project, adminApproved: !project.adminApproved })}><FileCheck2 size={16} /> {project.adminApproved ? 'Uygulama admin tarafından onaylandı' : 'Uygulamayı tamamlandı olarak onayla'}</button>}</section>
         </div>}
       </article>
-    })}</section>
+    })}{visible.length === 0 && <div className="empty-list panel">Bu listede gösterilecek proje bulunmuyor.</div>}</section>
     <EntityDetailModal subject={profile} onClose={() => setProfile(null)} />
   </div>
 }

@@ -41,6 +41,12 @@ export function sortProjectsNewestFirst(projects: Project[]) {
   return [...projects].sort((a, b) => order(b) - order(a))
 }
 
+export function directionsUrl(latitude?: number, longitude?: number, address?: string) {
+  const hasCoordinates = Number.isFinite(latitude) && Number.isFinite(longitude)
+  const destination = hasCoordinates ? `${latitude},${longitude}` : address?.trim()
+  return destination ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}` : undefined
+}
+
 export function formatCurrency(value: number) {
   return new Intl.NumberFormat('tr-TR', {
     style: 'currency',
