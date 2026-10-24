@@ -1,0 +1,10 @@
+{
+  "name": "Akıştan Saha",
+  "short_name": "Akıştan",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f1e9",
+  "theme_color": "#143c3c",
+  "lang": "tr",
+  "icons": []
+}
