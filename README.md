@@ -1,18 +1,25 @@
 # Tesisat Pro
 
-Doğalgaz, sıhhi tesisat ve ısı pompası firmaları için mobil uyumlu saha operasyonu MVP'si.
+Doğalgaz, ısı pompası, sıhhi tesisat ve klima firmaları için mobil uyumlu saha operasyonu MVP'si.
 
 ## Neler çalışıyor?
 
 - Admin, usta, proje takipçisi ve müşteri rolleri
+- Yönetici kullanıcı oluşturma, düzenleme ve aktif/pasif yönetimi
 - Müşteri oluşturma ve arama
 - Dört adımlı hızlı keşif akışı
 - Hazır oda şablonları ve yeni oda ekleme
 - Oda bazında radyatör marka/ölçü seçimi
 - Kombi marka ve kapasite seçimi
+- Düzenlenebilir keşif şablonları ve serbest iş kalemi seçimi
+- Klima ve ısı pompası marka/güç seçenekleri
 - Ürün kataloğundan otomatik maliyet, satış, KDV ve kâr hesabı
+- Tarih bazlı alış/satış fiyat geçmişi
 - Usta randevuları ve malzeme hazırlık listeleri
-- Doğalgaz, sıhhi tesisat ve ısı pompası proje aşamaları
+- Kabul edilen keşfi usta ve gün atayarak projeye dönüştürme
+- Düzenlenebilir malzeme listesi ile PDF/Excel çıktısı
+- Usta fotoğraf/video yükleme ve admin onay akışı
+- AKSA proje, onay, abonelik, randevu ve gaz açılış aşamaları
 - Tahsilat kaydı ve kalan bakiye takibi
 - Ürün maliyet/satış fiyatı güncelleme
 - Yönetim raporları ve mobil uyumlu arayüz

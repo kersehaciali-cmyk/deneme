@@ -10,9 +10,10 @@ import { Payments } from './pages/Payments'
 import { Projects } from './pages/Projects'
 import { Reports } from './pages/Reports'
 import { Surveys } from './pages/Surveys'
+import { Users } from './pages/Users'
 import type { PageKey } from './types'
 
-const pages: PageKey[] = ['dashboard', 'customers', 'surveys', 'jobs', 'projects', 'payments', 'catalog', 'reports']
+const pages: PageKey[] = ['dashboard', 'users', 'customers', 'surveys', 'jobs', 'projects', 'payments', 'catalog', 'reports']
 
 export default function App() {
   const { role } = useApp()
@@ -31,6 +32,7 @@ export default function App() {
 
   const content = {
     dashboard: <Dashboard onNavigate={navigate} />,
+    users: <Users />,
     customers: <Customers />,
     surveys: <Surveys />,
     jobs: <Jobs />,

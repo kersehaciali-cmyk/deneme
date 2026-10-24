@@ -8,6 +8,7 @@ import {
   Milestone,
   PackageSearch,
   Search,
+  ShieldCheck,
   UsersRound,
   WalletCards,
   Wrench,
@@ -26,6 +27,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { key: 'dashboard', label: 'Genel bakış', icon: LayoutDashboard },
+  { key: 'users', label: 'Kullanıcılar', icon: ShieldCheck },
   { key: 'customers', label: 'Müşteriler', icon: UsersRound },
   { key: 'surveys', label: 'Keşifler', icon: ClipboardPenLine },
   { key: 'jobs', label: 'İşler & ustalar', icon: Wrench },

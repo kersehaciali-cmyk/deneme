@@ -1,6 +1,16 @@
 export type Role = 'admin' | 'usta' | 'proje' | 'musteri'
-export type PageKey = 'dashboard' | 'customers' | 'surveys' | 'jobs' | 'projects' | 'payments' | 'catalog' | 'reports'
-export type SurveyType = 'Doğalgaz' | 'Sıhhi Tesisat' | 'Isı Pompası'
+export type PageKey = 'dashboard' | 'users' | 'customers' | 'surveys' | 'jobs' | 'projects' | 'payments' | 'catalog' | 'reports'
+export type SurveyType = 'Doğalgaz' | 'Sıhhi Tesisat' | 'Isı Pompası' | 'Klima'
+export type SurveyStatus = 'Taslak' | 'Fiyatlandırıldı' | 'Teklif Gönderildi' | 'Kabul Edildi' | 'Onaylandı' | 'Siparişe Alındı' | 'Projeye Dönüştü' | 'Reddedildi'
+
+export interface AppUser {
+  id: string
+  name: string
+  phone: string
+  email: string
+  role: Role
+  active: boolean
+}
 
 export interface Customer {
   id: string
@@ -17,6 +27,7 @@ export interface Room {
   id: string
   name: string
   radiatorProductId?: string
+  radiatorQuantity?: number
 }
 
 export interface SurveyLine {
@@ -30,9 +41,11 @@ export interface Survey {
   id: string
   customerId: string
   type: SurveyType
-  status: 'Taslak' | 'Fiyatlandırıldı' | 'Teklif Gönderildi' | 'Onaylandı'
+  status: SurveyStatus
   rooms: Room[]
   lines: SurveyLine[]
+  templateId?: string
+  workItemKeys?: string[]
   total: number
   createdAt: string
   owner: string
@@ -46,9 +59,31 @@ export interface Product {
   unit: string
   cost: number
   sale: number
-  group?: 'Kombi' | 'Radyatör' | 'Malzeme' | 'İşçilik'
+  group?: 'Kombi' | 'Radyatör' | 'Isı Pompası' | 'Klima' | 'Malzeme' | 'İşçilik'
   brand?: string
   variant?: string
+  priceHistory?: PriceHistoryEntry[]
+}
+
+export interface PriceHistoryEntry {
+  id: string
+  date: string
+  cost: number
+  sale: number
+}
+
+export interface SurveyTemplate {
+  id: string
+  name: string
+  type: SurveyType
+  workItemKeys: string[]
+}
+
+export interface WorkItemDefinition {
+  key: string
+  label: string
+  type: SurveyType
+  description: string
 }
 
 export interface ChecklistItem {
@@ -75,6 +110,31 @@ export interface Project {
   stages: string[]
   owner: string
   dueDate: string
+  surveyId?: string
+  assignedMasterId?: string
+  applicationDate?: string
+  materials?: ProjectMaterial[]
+  attachments?: ProjectAttachment[]
+  adminApproved?: boolean
+}
+
+export interface ProjectMaterial {
+  id: string
+  productId?: string
+  label: string
+  quantity: number
+  unit: string
+  prepared: boolean
+}
+
+export interface ProjectAttachment {
+  id: string
+  name: string
+  type: 'image' | 'video'
+  url: string
+  addedBy: string
+  createdAt: string
+  approved: boolean
 }
 
 export interface Payment {

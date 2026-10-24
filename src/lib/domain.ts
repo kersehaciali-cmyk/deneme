@@ -1,8 +1,8 @@
 import type { PageKey, Product, Role, SurveyLine } from '../types'
 
 const permissions: Record<Role, PageKey[]> = {
-  admin: ['dashboard', 'customers', 'surveys', 'jobs', 'projects', 'payments', 'catalog', 'reports'],
-  usta: ['dashboard', 'customers', 'surveys', 'jobs'],
+  admin: ['dashboard', 'users', 'customers', 'surveys', 'jobs', 'projects', 'payments', 'catalog', 'reports'],
+  usta: ['dashboard', 'customers', 'surveys', 'jobs', 'projects'],
   proje: ['dashboard', 'customers', 'surveys', 'jobs', 'projects', 'payments'],
   musteri: ['dashboard', 'projects', 'payments'],
 }

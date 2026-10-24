@@ -19,6 +19,9 @@ describe('domain rules', () => {
   it('keeps customer away from administrative pages', () => {
     expect(canAccess('musteri', 'catalog')).toBe(false)
     expect(canAccess('admin', 'catalog')).toBe(true)
+    expect(canAccess('admin', 'users')).toBe(true)
+    expect(canAccess('usta', 'users')).toBe(false)
+    expect(canAccess('usta', 'projects')).toBe(true)
   })
 
   it('calculates stage progress', () => {
