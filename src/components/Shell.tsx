@@ -2,8 +2,11 @@ import {
   Bell,
   ChartNoAxesCombined,
   ClipboardPenLine,
+  Cloud,
+  CloudOff,
   Droplets,
   LayoutDashboard,
+  LogOut,
   Menu,
   Milestone,
   PackageSearch,
@@ -18,6 +21,7 @@ import { useState, type ComponentType, type ReactNode } from 'react'
 import { canAccess, initials } from '../lib/domain'
 import type { PageKey, Role } from '../types'
 import { useApp } from '../context/AppContext'
+import { useAuth } from '../context/AuthContext'
 
 interface NavItem {
   key: PageKey
@@ -44,15 +48,9 @@ const roleLabels: Record<Role, string> = {
   musteri: 'Müşteri',
 }
 
-const userNames: Record<Role, string> = {
-  admin: 'Zeynep Şahin',
-  usta: 'Mehmet Usta',
-  proje: 'Derya Çetin',
-  musteri: 'Ayşe Yılmaz',
-}
-
 export function Shell({ page, onNavigate, children }: { page: PageKey; onNavigate: (page: PageKey) => void; children: ReactNode }) {
-  const { role, setRole } = useApp()
+  const { role, currentUser, syncStatus } = useApp()
+  const { signOut } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
   const visibleItems = navItems.filter((item) => canAccess(role, item.key))
   const current = navItems.find((item) => item.key === page)
@@ -81,13 +79,14 @@ export function Shell({ page, onNavigate, children }: { page: PageKey; onNavigat
             </button>
           ))}
         </nav>
-        <div className="sidebar-help">
-          <span className="signal-dot" />
-          <div><strong>Saha bağlantısı aktif</strong><small>Son eşitleme şimdi</small></div>
+        <div className={`sidebar-help sync-${syncStatus}`}>
+          {syncStatus === 'error' ? <CloudOff size={17} /> : <Cloud size={17} />}
+          <div><strong>{syncStatus === 'error' ? 'Bağlantı sorunu' : syncStatus === 'loading' ? 'Veriler eşitleniyor' : 'Bulut bağlantısı aktif'}</strong><small>{syncStatus === 'online' ? 'Tüm cihazlarda güncel' : syncStatus === 'error' ? 'İnternetinizi kontrol edin' : 'Lütfen bekleyin'}</small></div>
         </div>
         <div className="profile-mini">
-          <div className="avatar">{initials(userNames[role])}</div>
-          <div><strong>{userNames[role]}</strong><span>{roleLabels[role]}</span></div>
+          <div className="avatar">{initials(currentUser.name)}</div>
+          <div><strong>{currentUser.name}</strong><span>{roleLabels[role]}</span></div>
+          <button onClick={() => void signOut()} title="Çıkış yap" aria-label="Çıkış yap"><LogOut size={16} /></button>
         </div>
       </aside>
 
@@ -105,12 +104,7 @@ export function Shell({ page, onNavigate, children }: { page: PageKey; onNavigat
           </label>
           <div className="topbar-actions">
             <button className="notification-button" aria-label="Bildirimler"><Bell size={20} /><span /></button>
-            <label className="role-switcher">
-              <span>Rol</span>
-              <select value={role} onChange={(event) => setRole(event.target.value as Role)}>
-                {Object.entries(roleLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}
-              </select>
-            </label>
+            <div className={`account-chip sync-${syncStatus}`}><span>{syncStatus === 'online' ? <Cloud size={15} /> : <CloudOff size={15} />}</span><div><strong>{currentUser.name}</strong><small>{roleLabels[role]}</small></div></div>
           </div>
         </header>
         <main className="main-content">{children}</main>

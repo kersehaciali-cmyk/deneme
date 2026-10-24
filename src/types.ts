@@ -10,6 +10,8 @@ export interface AppUser {
   email: string
   role: Role
   active: boolean
+  organizationId?: string
+  customerId?: string
 }
 
 export interface Customer {

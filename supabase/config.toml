@@ -1,0 +1,5 @@
+project_id = "tesisat-pro"
+
+[functions.admin-users]
+verify_jwt = true
+

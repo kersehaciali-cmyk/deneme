@@ -6,14 +6,26 @@ export function MediaPreview({ id, url, type, alt }: { id: string; url: string; 
 
   useEffect(() => {
     let generatedUrl: string | undefined
+    let retryTimer: number | undefined
     let active = true
-    loadMediaFileUrl(id).then((storedUrl) => {
-      if (!active || !storedUrl) return
-      generatedUrl = storedUrl
-      setSource(storedUrl)
-    }).catch(() => undefined)
+    const load = (attempt = 0) => {
+      loadMediaFileUrl(id).then((storedUrl) => {
+        if (!active) return
+        if (!storedUrl && attempt < 3) {
+          retryTimer = window.setTimeout(() => load(attempt + 1), 1800)
+          return
+        }
+        if (!storedUrl) return
+        generatedUrl = storedUrl
+        setSource(storedUrl)
+      }).catch(() => {
+        if (active && attempt < 3) retryTimer = window.setTimeout(() => load(attempt + 1), 1800)
+      })
+    }
+    load()
     return () => {
       active = false
+      if (retryTimer) window.clearTimeout(retryTimer)
       if (generatedUrl) URL.revokeObjectURL(generatedUrl)
     }
   }, [id])

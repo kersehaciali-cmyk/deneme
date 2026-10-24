@@ -1,13 +1,19 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { acStages, gasStages, heatPumpStages, plumbingStages, seedCustomers, seedJobs, seedPayments, seedProducts, seedProjects, seedSurveys, seedTemplates, seedUsers } from '../data'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { acStages, gasStages, heatPumpStages, plumbingStages, seedCustomers, seedJobs, seedPayments, seedProducts, seedProjects, seedSurveys, seedTemplates } from '../data'
+import { supabase } from '../lib/supabase'
 import type { AppUser, Customer, Job, Payment, Product, Project, Role, Survey, SurveyTemplate } from '../types'
+import { useAuth } from './AuthContext'
+
+type SyncStatus = 'loading' | 'online' | 'error'
+type EntityType = 'customer' | 'survey' | 'template' | 'product' | 'job' | 'project' | 'payment'
 
 interface AppState {
   role: Role
-  setRole: (role: Role) => void
+  currentUser: AppUser
+  syncStatus: SyncStatus
   users: AppUser[]
-  addUser: (user: Omit<AppUser, 'id'>) => void
-  updateUser: (user: AppUser) => void
+  addUser: (user: Omit<AppUser, 'id'>) => Promise<void>
+  updateUser: (user: AppUser, password?: string) => Promise<void>
   customers: Customer[]
   addCustomer: (customer: Omit<Customer, 'id' | 'createdAt' | 'openProjectCount' | 'balance'>) => Customer
   surveys: Survey[]
@@ -29,74 +35,148 @@ interface AppState {
 
 const AppContext = createContext<AppState | undefined>(undefined)
 
-function useStoredState<T>(key: string, fallback: T) {
-  const [value, setValue] = useState<T>(() => {
-    try {
-      const stored = localStorage.getItem(key)
-      return stored ? (JSON.parse(stored) as T) : fallback
-    } catch {
-      return fallback
-    }
-  })
+interface CloudRecord {
+  entity_type: EntityType
+  entity_id: string
+  data: unknown
+}
 
-  useEffect(() => {
-    localStorage.setItem(key, JSON.stringify(value))
-  }, [key, value])
+const seedCollections: Record<EntityType, Array<{ id: string }>> = {
+  customer: seedCustomers,
+  survey: seedSurveys,
+  template: seedTemplates,
+  product: seedProducts,
+  job: seedJobs,
+  project: seedProjects,
+  payment: seedPayments,
+}
 
-  return [value, setValue] as const
+function mapProfile(row: Record<string, unknown>): AppUser {
+  return {
+    id: String(row.id),
+    name: String(row.name ?? ''),
+    phone: String(row.phone ?? ''),
+    email: String(row.email ?? ''),
+    role: row.role as Role,
+    active: Boolean(row.active),
+    organizationId: String(row.organization_id ?? ''),
+    customerId: row.customer_id ? String(row.customer_id) : undefined,
+  }
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [role, setRole] = useStoredState<Role>('tesisat-pro-v2-role', 'admin')
-  const [users, setUsers] = useStoredState('tesisat-pro-v2-users', seedUsers)
-  const [customers, setCustomers] = useStoredState('tesisat-pro-v2-customers', seedCustomers)
-  const [surveys, setSurveys] = useStoredState('tesisat-pro-v2-surveys', seedSurveys)
-  const [templates, setTemplates] = useStoredState('tesisat-pro-v2-templates', seedTemplates)
-  const [products, setProducts] = useStoredState('tesisat-pro-v2-products', seedProducts)
-  const [jobs, setJobs] = useStoredState('tesisat-pro-v2-jobs', seedJobs)
-  const [projects, setProjects] = useStoredState('tesisat-pro-v2-projects', seedProjects)
-  const [payments, setPayments] = useStoredState('tesisat-pro-v2-payments', seedPayments)
+  const { profile } = useAuth()
+  const organizationId = profile?.organizationId ?? ''
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('loading')
+  const [users, setUsers] = useState<AppUser[]>([])
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [surveys, setSurveys] = useState<Survey[]>([])
+  const [templates, setTemplates] = useState<SurveyTemplate[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+  const [jobs, setJobs] = useState<Job[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [payments, setPayments] = useState<Payment[]>([])
+
+  const applyRecords = useCallback((records: CloudRecord[]) => {
+    const ofType = <T,>(type: EntityType) => records.filter((record) => record.entity_type === type).map((record) => record.data as T)
+    setCustomers(ofType<Customer>('customer'))
+    setSurveys(ofType<Survey>('survey'))
+    setTemplates(ofType<SurveyTemplate>('template'))
+    setProducts(ofType<Product>('product'))
+    setJobs(ofType<Job>('job'))
+    setProjects(ofType<Project>('project'))
+    setPayments(ofType<Payment>('payment'))
+  }, [])
+
+  const loadCloudData = useCallback(async () => {
+    if (!supabase || !organizationId) return
+    setSyncStatus('loading')
+    try {
+      const [recordsResult, profilesResult] = await Promise.all([
+        supabase.from('app_records').select('entity_type,entity_id,data').eq('organization_id', organizationId),
+        supabase.from('profiles').select('id,name,phone,email,role,active,organization_id,customer_id').eq('organization_id', organizationId).order('name'),
+      ])
+      if (recordsResult.error) throw recordsResult.error
+      if (profilesResult.error) throw profilesResult.error
+      let records = (recordsResult.data ?? []) as CloudRecord[]
+      if (records.length === 0 && profile?.role === 'admin') {
+        const seedRows = (Object.entries(seedCollections) as [EntityType, Array<{ id: string }>][]).flatMap(([entityType, items]) => items.map((item) => ({ organization_id: organizationId, entity_type: entityType, entity_id: item.id, data: item })))
+        const { error } = await supabase.from('app_records').upsert(seedRows)
+        if (error) throw error
+        records = seedRows.map(({ entity_type, entity_id, data }) => ({ entity_type, entity_id, data }))
+      }
+      applyRecords(records)
+      setUsers((profilesResult.data ?? []).map((row) => mapProfile(row)))
+      setSyncStatus('online')
+    } catch {
+      setSyncStatus('error')
+    }
+  }, [applyRecords, organizationId, profile?.role])
+
+  useEffect(() => {
+    void loadCloudData()
+    if (!supabase || !organizationId) return
+    const client = supabase
+    const channel = client.channel(`organization-${organizationId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_records', filter: `organization_id=eq.${organizationId}` }, () => { void loadCloudData() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `organization_id=eq.${organizationId}` }, () => { void loadCloudData() })
+      .subscribe()
+    return () => { void client.removeChannel(channel) }
+  }, [loadCloudData, organizationId])
+
+  const saveRecord = useCallback((entityType: EntityType, entity: { id: string }) => {
+    if (!supabase || !organizationId) return
+    setSyncStatus('loading')
+    void supabase.from('app_records').upsert({ organization_id: organizationId, entity_type: entityType, entity_id: entity.id, data: entity }).then(({ error }) => setSyncStatus(error ? 'error' : 'online'))
+  }, [organizationId])
 
   const value = useMemo<AppState>(() => ({
-    role,
-    setRole,
+    role: profile?.role ?? 'musteri',
+    currentUser: profile!,
+    syncStatus,
     users,
-    addUser: (user) => setUsers((current) => [{ ...user, id: `usr-${Date.now()}` }, ...current]),
-    updateUser: (user) => setUsers((current) => current.map((item) => item.id === user.id ? user : item)),
+    addUser: async (user) => {
+      if (!supabase) throw new Error('Bulut bağlantısı bulunamadı.')
+      const { error } = await supabase.functions.invoke('admin-users', { body: { action: 'create', user } })
+      if (error) throw error
+      await loadCloudData()
+    },
+    updateUser: async (user, password) => {
+      if (!supabase) throw new Error('Bulut bağlantısı bulunamadı.')
+      const { error } = await supabase.functions.invoke('admin-users', { body: { action: 'update', user, password: password || undefined } })
+      if (error) throw error
+      await loadCloudData()
+    },
     customers,
     addCustomer: (input) => {
-      const customer: Customer = {
-        ...input,
-        id: `mus-${Date.now()}`,
-        createdAt: new Date().toISOString().slice(0, 10),
-        openProjectCount: 0,
-        balance: 0,
-      }
+      const customer: Customer = { ...input, id: `mus-${Date.now()}`, createdAt: new Date().toISOString().slice(0, 10), openProjectCount: 0, balance: 0 }
       setCustomers((current) => [customer, ...current])
+      saveRecord('customer', customer)
       return customer
     },
     surveys,
-    addSurvey: (survey) => setSurveys((current) => [survey, ...current]),
-    updateSurvey: (survey) => setSurveys((current) => current.map((item) => item.id === survey.id ? survey : item)),
+    addSurvey: (survey) => { setSurveys((current) => [survey, ...current]); saveRecord('survey', survey) },
+    updateSurvey: (survey) => { setSurveys((current) => current.map((item) => item.id === survey.id ? survey : item)); saveRecord('survey', survey) },
     templates,
-    addTemplate: (template) => setTemplates((current) => [...current, { ...template, id: `tpl-${Date.now()}` }]),
-    updateTemplate: (template) => setTemplates((current) => current.map((item) => item.id === template.id ? template : item)),
+    addTemplate: (input) => {
+      const template = { ...input, id: `tpl-${Date.now()}` }
+      setTemplates((current) => [...current, template])
+      saveRecord('template', template)
+    },
+    updateTemplate: (template) => { setTemplates((current) => current.map((item) => item.id === template.id ? template : item)); saveRecord('template', template) },
     products,
-    updateProduct: (product) => setProducts((current) => current.map((item) => {
-      if (item.id !== product.id) return item
-      if (item.cost === product.cost && item.sale === product.sale) return product
-      return {
-        ...product,
-        priceHistory: [
-          ...(item.priceHistory ?? []),
-          { id: `${product.id}-${Date.now()}`, date: new Date().toISOString().slice(0, 10), cost: product.cost, sale: product.sale },
-        ],
-      }
-    })),
+    updateProduct: (product) => {
+      const previous = products.find((item) => item.id === product.id)
+      const next = previous && (previous.cost !== product.cost || previous.sale !== product.sale)
+        ? { ...product, priceHistory: [...(previous.priceHistory ?? []), { id: `${product.id}-${Date.now()}`, date: new Date().toISOString().slice(0, 10), cost: product.cost, sale: product.sale }] }
+        : product
+      setProducts((current) => current.map((item) => item.id === next.id ? next : item))
+      saveRecord('product', next)
+    },
     jobs,
-    updateJob: (job) => setJobs((current) => current.map((item) => item.id === job.id ? job : item)),
+    updateJob: (job) => { setJobs((current) => current.map((item) => item.id === job.id ? job : item)); saveRecord('job', job) },
     projects,
-    updateProject: (project) => setProjects((current) => current.map((item) => item.id === project.id ? project : item)),
+    updateProject: (project) => { setProjects((current) => current.map((item) => item.id === project.id ? project : item)); saveRecord('project', project) },
     convertSurveyToProject: (surveyId, masterId, applicationDate) => {
       const survey = surveys.find((item) => item.id === surveyId)
       if (!survey) return undefined
@@ -109,53 +189,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const product = products.find((item) => item.id === line.productId)
         return { id: `mat-${line.id}`, productId: line.productId, label: product ? `${product.name}${product.variant ? ` · ${product.variant}` : ''}` : line.productId, quantity: line.quantity, unit: product?.unit ?? 'adet', prepared: false }
       })
-      const project: Project = {
-        id: `PRJ-${100 + projects.length}`,
-        customerId: survey.customerId,
-        surveyId,
-        type: survey.type,
-        createdAt: new Date().toISOString().slice(0, 10),
-        currentStage: 0,
-        stages,
-        owner: manager?.name ?? 'Proje Takipçisi',
-        ownerId: manager?.id,
-        dueDate: due.toISOString().slice(0, 10),
-        assignedMasterId: masterId,
-        applicationDate,
-        siteAddress: survey.siteAddress,
-        siteContactName: survey.siteContactName,
-        siteContactPhone: survey.siteContactPhone,
-        latitude: survey.latitude,
-        longitude: survey.longitude,
-        materials,
-        attachments: [],
-        adminApproved: false,
-      }
-      setProjects((current) => [project, ...current])
-      setSurveys((current) => current.map((item) => item.id === surveyId ? { ...item, status: 'Projeye Dönüştü' } : item))
-      setCustomers((current) => current.map((customer) => customer.id === survey.customerId ? { ...customer, openProjectCount: customer.openProjectCount + 1 } : customer))
-      const job: Job = {
-        id: `IS-${300 + jobs.length}`,
-        customerId: survey.customerId,
-        projectId: project.id,
-        title: `${survey.type} uygulaması`,
-        assignee: master?.name ?? 'Atanmadı',
-        appointment: applicationDate,
-        status: 'Planlandı',
-        siteAddress: survey.siteAddress,
-        siteContactName: survey.siteContactName,
-        siteContactPhone: survey.siteContactPhone,
-        latitude: survey.latitude,
-        longitude: survey.longitude,
-        checklist: materials.map((material) => ({ id: `check-${material.id}`, label: `${material.label} · ${material.quantity} ${material.unit}`, done: false })),
-      }
-      setJobs((current) => [job, ...current])
+      const project: Project = { id: `PRJ-${Date.now()}`, customerId: survey.customerId, surveyId, type: survey.type, createdAt: new Date().toISOString().slice(0, 10), currentStage: 0, stages, owner: manager?.name ?? 'Proje Takipçisi', ownerId: manager?.id, dueDate: due.toISOString().slice(0, 10), assignedMasterId: masterId, applicationDate, siteAddress: survey.siteAddress, siteContactName: survey.siteContactName, siteContactPhone: survey.siteContactPhone, latitude: survey.latitude, longitude: survey.longitude, materials, attachments: [], adminApproved: false }
+      const nextSurvey = { ...survey, status: 'Projeye Dönüştü' as const }
+      const customer = customers.find((item) => item.id === survey.customerId)
+      const nextCustomer = customer ? { ...customer, openProjectCount: customer.openProjectCount + 1 } : undefined
+      const job: Job = { id: `IS-${Date.now()}`, customerId: survey.customerId, projectId: project.id, title: `${survey.type} uygulaması`, assignee: master?.name ?? 'Atanmadı', appointment: applicationDate, status: 'Planlandı', siteAddress: survey.siteAddress, siteContactName: survey.siteContactName, siteContactPhone: survey.siteContactPhone, latitude: survey.latitude, longitude: survey.longitude, checklist: materials.map((material) => ({ id: `check-${material.id}`, label: `${material.label} · ${material.quantity} ${material.unit}`, done: false })) }
+      setProjects((current) => [project, ...current]); saveRecord('project', project)
+      setSurveys((current) => current.map((item) => item.id === surveyId ? nextSurvey : item)); saveRecord('survey', nextSurvey)
+      if (nextCustomer) { setCustomers((current) => current.map((item) => item.id === nextCustomer.id ? nextCustomer : item)); saveRecord('customer', nextCustomer) }
+      setJobs((current) => [job, ...current]); saveRecord('job', job)
       return project
     },
     payments,
-    updatePayment: (payment) => setPayments((current) => current.map((item) => item.id === payment.id ? payment : item)),
-  }), [role, setRole, users, setUsers, customers, setCustomers, surveys, setSurveys, templates, setTemplates, products, setProducts, jobs, setJobs, projects, setProjects, payments, setPayments])
+    updatePayment: (payment) => { setPayments((current) => current.map((item) => item.id === payment.id ? payment : item)); saveRecord('payment', payment) },
+  }), [customers, jobs, loadCloudData, payments, products, profile, projects, saveRecord, surveys, syncStatus, templates, users])
 
+  if (syncStatus === 'loading' && products.length === 0) return <div className="cloud-loading"><span /><strong>Şirket verileri eşitleniyor…</strong></div>
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }
 

@@ -1,51 +1,57 @@
 # Tesisat PRO
 
-Doğalgaz, ısı pompası, sıhhi tesisat ve klima firmaları için mobil uyumlu saha operasyonu MVP'si.
+Doğalgaz, ısı pompası, sıhhi tesisat ve klima firmaları için internet bağlantılı saha ve ofis uygulaması.
 
-## Neler çalışıyor?
+## Uygulama sürümleri
 
-- Admin, usta, proje takipçisi ve müşteri rolleri
-- Yönetici kullanıcı oluşturma, düzenleme ve aktif/pasif yönetimi
-- Müşteri oluşturma ve arama
-- Dört adımlı hızlı keşif akışı
-- Hazır oda şablonları ve yeni oda ekleme
-- Oda bazında radyatör marka/ölçü seçimi
-- Keşif adresi, saha iletişim kişisi ve müşteri/cari bilgilerinin ayrı tutulması
-- Tarayıcı konum izniyle GPS alma, manuel enlem-boylam ve Google Maps yol tarifi
-- Keşif, biten iş ve proje onayı bekleyen hızlı listeleri
-- Açıklamalı keşif fotoğrafları
-- Kombi marka ve kapasite seçimi
-- Düzenlenebilir keşif şablonları ve serbest iş kalemi seçimi
-- Klima ve ısı pompası marka/güç seçenekleri
-- Ürün kataloğundan otomatik maliyet, satış, KDV ve kâr hesabı
-- Tarih bazlı alış/satış fiyat geçmişi
-- Usta randevuları ve malzeme hazırlık listeleri
-- Kabul edilen keşfi usta ve gün atayarak projeye dönüştürme
-- Düzenlenebilir malzeme listesi ile PDF/Excel çıktısı
-- Usta fotoğraf/video yükleme, açıklama, yönetici yorumu ve onay akışı
-- AKSA proje, onay, abonelik, randevu ve gaz açılış aşamaları
-- Tahsilat kaydı ve kalan bakiye takibi
-- Ürün maliyet/satış fiyatı güncelleme
-- Yönetim raporları ve mobil uyumlu arayüz
+- Web: Tarayıcıdan ve kurulabilir PWA olarak çalışır.
+- Android: Capacitor tabanlı yerel Android projesi ve APK üretimi hazırdır.
+- Windows: Electron tabanlı masaüstü kurulum paketi üretimi hazırdır.
 
-Bu sürüm kayıt verilerini tarayıcının `localStorage`, medya dosyalarını `IndexedDB` alanında saklar. Çok kullanıcılı canlı kullanım için API, PostgreSQL, merkezi dosya depolama ve gerçek kimlik doğrulama sonraki üretim katmanıdır.
+## Merkezi sistem
 
-## Geliştirme
+Uygulama Supabase üzerinde çalışır:
 
-Node.js 20 veya üzeri gereklidir.
+- Her kullanıcıya ayrı e-posta ve şifre
+- Yönetici, usta, proje takipçisi ve müşteri yetkileri
+- E-postayla şifre yenileme
+- Yönetici tarafından kullanıcı daveti, rol/aktiflik ve şifre yönetimi
+- PostgreSQL üzerinde ortak müşteri, keşif, proje, iş, ödeme ve katalog kayıtları
+- Telefon ve bilgisayarlar arasında anlık veri eşitleme
+- Özel dosya alanında fotoğraf ve video saklama
+- Şirket ve rol bazlı veritabanı güvenlik kuralları
+
+Şifreler uygulama kayıtlarında tutulmaz. Kimlik doğrulama servisi tarafından güvenli biçimde yönetilir. Supabase `service_role` anahtarı hiçbir zaman masaüstü, web veya mobil uygulamanın `.env` dosyasına yazılmamalıdır.
+
+## Hızlı geliştirme
+
+Node.js 22 veya üzeri gereklidir.
 
 ```bash
-npm install --no-audit --no-fund
+npm install
 npm run dev
 ```
 
-Uygulama varsayılan olarak `http://localhost:4173` adresinde açılır.
+Bulut bağlantısı için `.env.example` dosyasını `.env` olarak kopyalayıp Supabase bilgilerini girin.
 
-## Doğrulama
+## Paket komutları
 
 ```bash
+# Kontrol
 npm test
 npm run build
+
+# Windows masaüstü uygulamasını çalıştır
+npm run desktop:run
+
+# Windows kurulum dosyası üret
+npm run desktop:build
+
+# Android web dosyalarını yerel projeye aktar
+npm run mobile:sync
+
+# Android Studio'da aç
+npm run mobile:open
 ```
 
-Rol seçici üzerinden dört kullanıcı görünümü denenebilir. Oluşturulan müşteri, keşif, ödeme ve fiyat değişiklikleri aynı tarayıcıda korunur.
+Ayrıntılı ilk kurulum, Supabase ve APK/Windows paketleme adımları için [Windows Kurulum Rehberi](docs/KURULUM-WINDOWS.md) dosyasını izleyin.

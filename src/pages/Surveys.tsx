@@ -107,7 +107,7 @@ export function Surveys() {
 }
 
 function SurveyWizard({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { customers, products, templates, addCustomer, addSurvey, surveys, role } = useApp()
+  const { customers, products, templates, addCustomer, addSurvey, surveys, role, currentUser } = useApp()
   const initialTemplate = templates.find((template) => template.type === 'Doğalgaz')
   const initialCustomer = customers[0]
   const [step, setStep] = useState(1)
@@ -278,7 +278,7 @@ function SurveyWizard({ open, onClose }: { open: boolean; onClose: () => void })
       const product = products.find((item) => item.id === line.productId)
       return { ...line, unitCost: product?.cost, unitSale: product?.sale }
     })
-    addSurvey({ id: `KSF-${1045 + surveys.length}`, customerId, type, status: role === 'usta' ? 'Taslak' : 'Fiyatlandırıldı', rooms: hasRadiators ? rooms : [], lines: pricedLines, templateId, workItemKeys, total: grandTotal, createdAt: new Date().toISOString().slice(0, 10), owner: role === 'usta' ? 'Mehmet Usta' : role === 'proje' ? 'Derya Çetin' : 'Zeynep Şahin', siteAddress: site.address.trim(), siteContactName: site.contactName.trim(), siteContactPhone: site.contactPhone.trim(), latitude: Number.isFinite(latitude) ? latitude : undefined, longitude: Number.isFinite(longitude) ? longitude : undefined, attachments: surveyPhotos })
+    addSurvey({ id: `KSF-${Date.now()}`, customerId, type, status: role === 'usta' ? 'Taslak' : 'Fiyatlandırıldı', rooms: hasRadiators ? rooms : [], lines: pricedLines, templateId, workItemKeys, total: grandTotal, createdAt: new Date().toISOString().slice(0, 10), owner: currentUser.name, siteAddress: site.address.trim(), siteContactName: site.contactName.trim(), siteContactPhone: site.contactPhone.trim(), latitude: Number.isFinite(latitude) ? latitude : undefined, longitude: Number.isFinite(longitude) ? longitude : undefined, attachments: surveyPhotos })
     resetAndClose(true)
   }
 

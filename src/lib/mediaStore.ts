@@ -1,5 +1,16 @@
+import { supabase } from './supabase'
+
 const databaseName = 'tesisat-pro-media'
 const storeName = 'files'
+
+async function cloudPath(id: string) {
+  if (!supabase) return undefined
+  const { data: auth } = await supabase.auth.getUser()
+  if (!auth.user) return undefined
+  const { data } = await supabase.from('profiles').select('organization_id').eq('id', auth.user.id).single()
+  if (!data?.organization_id) return undefined
+  return `${data.organization_id}/${id.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+}
 
 function openDatabase() {
   return new Promise<IDBDatabase>((resolve, reject) => {
@@ -22,6 +33,11 @@ export async function saveMediaFile(id: string, file: File) {
     transaction.onerror = () => reject(transaction.error)
   })
   database.close()
+  const path = await cloudPath(id)
+  if (path && supabase) {
+    const { error } = await supabase.storage.from('media').upload(path, file, { upsert: true, contentType: file.type || undefined })
+    if (error) throw error
+  }
 }
 
 export async function loadMediaFileUrl(id: string) {
@@ -32,7 +48,12 @@ export async function loadMediaFileUrl(id: string) {
     request.onerror = () => reject(request.error)
   })
   database.close()
-  return file ? URL.createObjectURL(file) : undefined
+  if (file) return URL.createObjectURL(file)
+  const path = await cloudPath(id)
+  if (!path || !supabase) return undefined
+  const { data, error } = await supabase.storage.from('media').createSignedUrl(path, 60 * 60)
+  if (error) return undefined
+  return data.signedUrl
 }
 
 export async function deleteMediaFile(id: string) {
@@ -44,4 +65,9 @@ export async function deleteMediaFile(id: string) {
     transaction.onerror = () => reject(transaction.error)
   })
   database.close()
+  const path = await cloudPath(id)
+  if (path && supabase) {
+    const { error } = await supabase.storage.from('media').remove([path])
+    if (error) throw error
+  }
 }
