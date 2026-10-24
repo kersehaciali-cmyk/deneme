@@ -1,9 +1,11 @@
-import { ArrowRight, CalendarClock, CheckCircle2, ClipboardPlus, Clock3, TrendingUp, UsersRound, WalletCards } from 'lucide-react'
+import { ArrowRight, CalendarClock, CheckCircle2, ClipboardPlus, Clock3, PackageCheck, TrendingUp, UsersRound, WalletCards } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { formatCurrency } from '../lib/domain'
 import type { PageKey } from '../types'
 
-const formatDate = (value: string) => new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul' }).format(new Date(value))
+const appointmentDate = (value: string) => new Date(`${value.slice(0, 10)}T12:00:00`)
+const formatDay = (value: string) => new Intl.DateTimeFormat('tr-TR', { day: '2-digit' }).format(appointmentDate(value))
+const formatWeekday = (value: string) => new Intl.DateTimeFormat('tr-TR', { weekday: 'short' }).format(appointmentDate(value))
 
 export function Dashboard({ onNavigate }: { onNavigate: (page: PageKey) => void }) {
   const { role, customers, surveys, jobs, projects, payments } = useApp()
@@ -11,6 +13,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageKey) => void 
   const completedJobs = jobs.filter((job) => job.status === 'Tamamlandı').length
   const activeProjects = projects.filter((project) => project.currentStage < project.stages.length - 1).length
   const isCustomer = role === 'musteri'
+  const isMaster = role === 'usta'
 
   return (
     <div className="page-stack">
@@ -27,7 +30,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageKey) => void 
         {!isCustomer && <Metric icon={<UsersRound />} label="Aktif müşteri" value={String(customers.length)} note="Bu ay +3" tone="teal" />}
         <Metric icon={<CalendarClock />} label={isCustomer ? 'Aktif projem' : 'Devam eden proje'} value={String(isCustomer ? 1 : activeProjects)} note="2 proje kritik aşamada" tone="orange" />
         <Metric icon={<CheckCircle2 />} label="Tamamlanan iş" value={String(isCustomer ? 2 : completedJobs + 23)} note="Bu ay %18 artış" tone="green" />
-        <Metric icon={<WalletCards />} label="Bekleyen tahsilat" value={formatCurrency(isCustomer ? 48500 : outstanding)} note="1 vadesi geçmiş" tone="berry" />
+        {isMaster ? <Metric icon={<PackageCheck />} label="Hazırlanacak iş" value="1" note="Yarın için malzeme listesi" tone="berry" /> : <Metric icon={<WalletCards />} label="Bekleyen tahsilat" value={formatCurrency(isCustomer ? 48500 : outstanding)} note="1 vadesi geçmiş" tone="berry" />}
       </section>
 
       <section className="dashboard-grid">
@@ -41,7 +44,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageKey) => void 
               const customer = customers.find((item) => item.id === job.customerId)
               return (
                 <div className="timeline-item" key={job.id}>
-                  <div className="time-column"><strong>{formatDate(job.appointment).split(' ')[2]}</strong><span>{index === 0 ? 'Bugün' : index === 1 ? 'Yarın' : 'Pzt'}</span></div>
+                  <div className="time-column"><strong>{formatDay(job.appointment)}</strong><span>{formatWeekday(job.appointment)}</span></div>
                   <div className={`timeline-pin pin-${index + 1}`} />
                   <div className="timeline-copy"><strong>{job.title}</strong><span>{customer?.name} · {customer?.district}</span></div>
                   <span className={`status-pill status-${job.status.toLocaleLowerCase('tr-TR').replaceAll(' ', '-')}`}>{job.status}</span>
@@ -52,15 +55,15 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageKey) => void 
         </article>
 
         <article className="panel attention-panel">
-          <div className="panel-heading"><div><span className="eyebrow">DİKKAT GEREKTİREN</span><h2>Bugünün notları</h2></div><span className="round-count">3</span></div>
+          <div className="panel-heading"><div><span className="eyebrow">DİKKAT GEREKTİREN</span><h2>Bugünün notları</h2></div><span className="round-count">{isMaster ? 2 : 3}</span></div>
           <button className="attention-card" onClick={() => onNavigate('jobs')}>
             <span className="attention-icon amber"><Clock3 size={19} /></span>
-            <span><strong>Malzeme hazırlığı eksik</strong><small>IS-284 · Yarın 09:30</small></span><ArrowRight size={17} />
+            <span><strong>Malzeme hazırlığı eksik</strong><small>IS-284 · Yarın</small></span><ArrowRight size={17} />
           </button>
-          <button className="attention-card" onClick={() => onNavigate('payments')}>
+          {!isMaster && <button className="attention-card" onClick={() => onNavigate('payments')}>
             <span className="attention-icon red"><WalletCards size={19} /></span>
             <span><strong>Vadesi geçen ödeme</strong><small>Murat Demir · 18.750 ₺</small></span><ArrowRight size={17} />
-          </button>
+          </button>}
           <button className="attention-card" onClick={() => onNavigate('projects')}>
             <span className="attention-icon teal"><TrendingUp size={19} /></span>
             <span><strong>AKSA onayı bekleniyor</strong><small>PRJ-090 · 3 gündür</small></span><ArrowRight size={17} />

@@ -158,6 +158,7 @@ h1, h2, h3, strong { font-family: Inter, 'Segoe UI', system-ui, sans-serif; }
 .contact-list span { display: flex; gap: 8px; align-items: flex-start; color: #6f7e7b; font-size: 9px; line-height: 1.5; }
 .contact-list svg { flex: 0 0 auto; color: #84928f; }
 .customer-stats { display: grid; grid-template-columns: 1fr 1.5fr; border-top: 1px solid #eeeee9; padding-top: 13px; gap: 10px; }
+.customer-stats.single { grid-template-columns: 1fr; }
 .customer-stats div + div { border-left: 1px solid #eeeee9; padding-left: 14px; }
 .customer-stats span, .customer-stats strong { display: block; }
 .customer-stats span { color: #939e9b; font-size: 8px; }
@@ -177,6 +178,7 @@ h1, h2, h3, strong { font-family: Inter, 'Segoe UI', system-ui, sans-serif; }
 .table-row > span > span strong { display: block; }
 .table-row small { color: #929c9a; font-size: 8px; margin-top: 3px; }
 .survey-table .table-row { grid-template-columns: .85fr 1.25fr .9fr .7fr .8fr 1fr; }
+.survey-table.without-price .table-row { grid-template-columns: .9fr 1.25fr .9fr .8fr 1fr; }
 .payment-table .table-row { grid-template-columns: 1.5fr .75fr .8fr .75fr .8fr .7fr .8fr; }
 .catalog-table .table-row { grid-template-columns: 1.45fr .9fr .5fr .8fr .8fr .6fr .6fr; }
 .type-dot { width: 7px; height: 7px; flex: 0 0 auto; display: inline-block; border-radius: 50%; }
@@ -228,6 +230,55 @@ h1, h2, h3, strong { font-family: Inter, 'Segoe UI', system-ui, sans-serif; }
 .type-icon.gas { background: #f9e9d7; color: #cf7b32; }
 .type-icon.water { background: #e2f0ee; color: #327a75; }
 .type-icon.heat { background: #eee9f2; color: #806493; }
+.customer-picker-head { display: flex; align-items: stretch; gap: 10px; }
+.customer-picker-head > label { flex: 1; min-height: 41px; border: 1px solid #dfe1db; border-radius: 9px; background: #fff; display: flex; align-items: center; gap: 8px; padding: 0 11px; color: #83918d; }
+.customer-picker-head input { flex: 1; min-width: 0; border: 0; outline: 0; color: var(--ink); font-size: 10px; }
+.new-customer-inline { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 11px; padding: 14px; border-radius: 10px; background: #f0f5f3; border: 1px solid #dce9e5; }
+.new-customer-inline label span { display: block; color: #758480; font-size: 8px; font-weight: 700; margin-bottom: 4px; }
+.new-customer-inline input { width: 100%; height: 35px; border: 1px solid #dce0da; border-radius: 7px; padding: 0 9px; outline: 0; font-size: 9px; }
+.new-customer-inline > button { grid-column: 2; justify-self: end; border: 0; border-radius: 7px; padding: 8px 11px; background: var(--teal); color: white; display: flex; align-items: center; gap: 5px; font-size: 9px; font-weight: 800; }
+.customer-results { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; margin-top: 11px; max-height: 142px; overflow: auto; }
+.customer-results > button { min-height: 51px; display: grid; grid-template-columns: 32px minmax(0,1fr) 18px; gap: 9px; align-items: center; padding: 8px 10px; border: 1px solid #e1e2dc; border-radius: 9px; background: white; color: var(--ink); text-align: left; }
+.customer-results > button.selected { border-color: #448c86; background: #f0f6f4; box-shadow: 0 0 0 2px rgba(23,111,107,.06); }
+.customer-results > button > span { width: 31px; height: 31px; border-radius: 8px; background: #e5f0ed; color: var(--teal); display: grid; place-items: center; font-size: 8px; font-weight: 800; }
+.customer-results strong, .customer-results small { display: block; }
+.customer-results strong { font-size: 9px; }
+.customer-results small { color: #8d9895; font-size: 7.5px; margin-top: 3px; }
+.customer-results svg { color: var(--teal); }
+.choice-label { display: block; color: #84918e; font-size: 8px; font-weight: 800; letter-spacing: .12em; margin: 20px 0 8px; }
+.ready-room-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; max-height: 330px; overflow: auto; padding-right: 4px; }
+.ready-room-grid > article { border: 1px solid #e1e2dc; border-radius: 10px; background: #fff; padding: 10px; transition: border-color .18s, background .18s; }
+.ready-room-grid > article.has-radiator { border-color: #83afa9; background: #f6faf8; }
+.ready-room-grid article > header { display: grid; grid-template-columns: 23px minmax(0,1fr) 25px; align-items: center; gap: 7px; }
+.ready-room-grid article > header > span { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 6px; background: #e9efec; color: #51635f; font-size: 8px; font-weight: 800; }
+.ready-room-grid article > header input { height: 29px; min-width: 0; border: 0; background: transparent; outline: 0; color: var(--ink); font-size: 10px; font-weight: 800; }
+.ready-room-grid article > header button { border: 0; background: transparent; color: #b16b65; padding: 4px; }
+.radiator-toggle { min-height: 33px; border-top: 1px solid #e9eae4; margin-top: 7px; padding-top: 7px; display: flex; align-items: center; gap: 7px; color: #697975; font-size: 8px; }
+.radiator-toggle > button { width: 17px; height: 17px; padding: 0; border: 1px solid #cbd2cc; border-radius: 5px; background: white; color: white; display: grid; place-items: center; }
+.radiator-toggle > button.checked { border-color: var(--teal); background: var(--teal); }
+.radiator-toggle svg { color: #d18038; }
+.radiator-toggle > button svg { color: #fff; }
+.radiator-selects { display: grid; grid-template-columns: 1fr 1fr auto; gap: 7px; align-items: end; padding-top: 5px; }
+.radiator-selects label > span { display: block; color: #8a9693; font-size: 7px; margin-bottom: 3px; }
+.radiator-selects select { width: 100%; height: 31px; border: 1px solid #dce0da; border-radius: 7px; background: #fff; color: var(--ink); padding: 0 7px; font-size: 8px; outline: 0; }
+.radiator-selects > small { color: var(--teal); font-size: 8px; font-weight: 800; padding-bottom: 9px; white-space: nowrap; }
+.new-room-row { display: flex; gap: 7px; margin-top: 11px; }
+.new-room-row > input { flex: 1; min-width: 0; border: 1px solid #dce0da; border-radius: 8px; padding: 0 10px; outline: 0; font-size: 10px; }
+.ready-room-grid + .dashed-button { margin-top: 11px; }
+.boiler-selector { border: 1px solid #e0e3dc; border-radius: 11px; background: #fbfaf7; margin-bottom: 18px; overflow: hidden; }
+.boiler-selector > header { min-height: 54px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e6e6e0; }
+.boiler-selector > header > div { display: flex; align-items: center; gap: 9px; color: #d07a32; }
+.boiler-selector > header span strong, .boiler-selector > header span small { display: block; }
+.boiler-selector > header strong { color: var(--ink); font-size: 10px; }
+.boiler-selector > header small { color: #8a9693; font-size: 7.5px; margin-top: 2px; }
+.boiler-selector > header > label { display: flex; align-items: center; gap: 5px; color: #667672; font-size: 8px; font-weight: 700; }
+.boiler-selector > div { display: grid; grid-template-columns: .75fr .75fr 1.4fr; gap: 10px; align-items: end; padding: 12px 14px; }
+.boiler-selector > div > label span, .boiler-selector > div > div > span { display: block; color: #899592; font-size: 7px; margin-bottom: 4px; }
+.boiler-selector select { width: 100%; height: 33px; border: 1px solid #dce0da; border-radius: 7px; background: white; color: var(--ink); padding: 0 8px; font-size: 9px; }
+.boiler-selector > div > div { min-height: 33px; border-left: 1px solid #e1e2dc; padding-left: 12px; }
+.boiler-selector > div > div strong, .boiler-selector > div > div small { display: block; }
+.boiler-selector > div > div strong { font-size: 9px; }
+.boiler-selector > div > div small { color: var(--teal); font-size: 8px; margin-top: 3px; font-weight: 800; }
 .plan-builder { display: grid; grid-template-columns: 390px 1fr; min-height: 440px; }
 .room-editor { padding: 23px; border-right: 1px solid #e8e7e1; }
 .room-list { max-height: 280px; overflow: auto; padding-right: 3px; }
@@ -263,12 +314,15 @@ h1, h2, h3, strong { font-family: Inter, 'Segoe UI', system-ui, sans-serif; }
 .picker-row > div:first-child > strong { font-size: 10px; margin: 2px 0; }
 .picker-row > div:first-child > small { color: #7f8d89; font-size: 8px; }
 .picker-row > b { text-align: right; font-size: 10px; }
+.picker-row.without-price { grid-template-columns: minmax(0,1fr) 100px; }
 .quantity-stepper { display: grid; grid-template-columns: 28px 1fr 28px; align-items: center; border: 1px solid #dfe1db; border-radius: 7px; overflow: hidden; }
 .quantity-stepper button { border: 0; height: 29px; background: #f5f5f1; color: var(--teal); font-weight: 800; }
 .quantity-stepper strong { text-align: center; font-size: 10px; }
 .inline-total { display: flex; justify-content: space-between; margin-top: 13px; padding: 12px 15px; background: #eef4f1; border-radius: 9px; color: #63746f; font-size: 9px; }
 .inline-total strong { color: var(--ink); }
 .summary-grid { padding: 28px; display: grid; grid-template-columns: 1.25fr .75fr; gap: 20px; }
+.summary-grid.no-price-summary { grid-template-columns: 1fr; }
+.master-price-note { margin-top: 12px; border-radius: 9px; padding: 11px 13px; background: #edf4f1; color: #58706b; font-size: 9px; line-height: 1.5; }
 .quote-summary dl { border: 1px solid #e6e5df; border-radius: 11px; overflow: hidden; margin: 0; }
 .quote-summary dl div { display: flex; justify-content: space-between; padding: 12px 14px; border-top: 1px solid #ecebe6; font-size: 10px; }
 .quote-summary dl div:first-child { border-top: 0; }
@@ -471,6 +525,16 @@ h1, h2, h3, strong { font-family: Inter, 'Segoe UI', system-ui, sans-serif; }
   .wizard-progress > div::after { left: 50%; right: -50%; }
   .wizard-section { padding: 19px 15px; }
   .type-choice-grid { grid-template-columns: 1fr; }
+  .customer-picker-head { align-items: stretch; flex-direction: column; }
+  .new-customer-inline { grid-template-columns: 1fr; }
+  .new-customer-inline > button { grid-column: 1; }
+  .customer-results { grid-template-columns: 1fr; }
+  .ready-room-grid { grid-template-columns: 1fr; max-height: none; }
+  .new-room-row { align-items: stretch; flex-direction: column; }
+  .new-room-row > input { min-height: 38px; }
+  .boiler-selector > header { align-items: flex-start; gap: 10px; }
+  .boiler-selector > div { grid-template-columns: 1fr 1fr; }
+  .boiler-selector > div > div { grid-column: 1 / -1; border-left: 0; border-top: 1px solid #e1e2dc; padding: 9px 0 0; }
   .plan-builder { display: block; }
   .room-editor, .floor-preview { padding: 17px 14px; }
   .floor-canvas { min-height: 220px; padding: 10px; }

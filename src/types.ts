@@ -16,8 +16,7 @@ export interface Customer {
 export interface Room {
   id: string
   name: string
-  width: number
-  length: number
+  radiatorProductId?: string
 }
 
 export interface SurveyLine {
@@ -47,6 +46,9 @@ export interface Product {
   unit: string
   cost: number
   sale: number
+  group?: 'Kombi' | 'Radyatör' | 'Malzeme' | 'İşçilik'
+  brand?: string
+  variant?: string
 }
 
 export interface ChecklistItem {

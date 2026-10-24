@@ -1,5 +1,5 @@
 {
-  "name": "akistan-saha",
+  "name": "tesisat-pro",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -19,6 +19,6 @@
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.7.2",
     "vite": "^6.0.5",
-    "vitest": "^2.1.8"
+    "vitest": "^5.0.5"
   }
 }

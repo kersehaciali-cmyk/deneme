@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext'
 import type { Job } from '../types'
 
 const jobFlow: Job['status'][] = ['Planlandı', 'Hazırlanıyor', 'Hazır', 'Yolda', 'Başladı', 'Tamamlandı']
-const formatAppointment = (value: string) => new Intl.DateTimeFormat('tr-TR', { weekday: 'short', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul' }).format(new Date(value))
+const formatAppointment = (value: string) => new Intl.DateTimeFormat('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${value.slice(0, 10)}T12:00:00`))
 
 export function Jobs() {
   const { jobs, customers, updateJob, role } = useApp()
@@ -27,7 +27,7 @@ export function Jobs() {
       const cannotAdvance = job.status === 'Hazırlanıyor' && !allReady
       return <article className="job-card panel" key={job.id}>
         <header><div><span className="job-number">{job.id}</span><em className={`status-pill status-${job.status.toLocaleLowerCase('tr-TR')}`}>{job.status}</em></div><h3>{job.title}</h3><p>{customer?.name} · {customer?.district}</p></header>
-        <div className="job-meta"><label><CalendarDays size={17} /><span>Randevu<input type="datetime-local" value={job.appointment} onChange={(event) => updateJob({ ...job, appointment: event.target.value })} /></span></label><div><UserRound size={17} /><span>Usta<strong>{job.assignee}</strong></span></div></div>
+        <div className="job-meta"><label><CalendarDays size={17} /><span>Randevu günü<input type="date" value={job.appointment.slice(0, 10)} onChange={(event) => updateJob({ ...job, appointment: event.target.value })} /></span></label><div><UserRound size={17} /><span>Usta<strong>{job.assignee}</strong></span></div></div>
         <div className="material-head"><div><strong>Malzeme hazırlığı</strong><span>{done}/{job.checklist.length} hazır</span></div><div className="mini-progress"><span style={{ width: `${(done / job.checklist.length) * 100}%` }} /></div></div>
         <div className="checklist">{job.checklist.map((item) => <label key={item.id} className={item.done ? 'checked' : ''}><button onClick={() => toggleItem(job, item.id)} aria-label={item.done ? 'İşareti kaldır' : 'Hazır işaretle'}>{item.done && <Check size={14} />}</button><span>{item.label}</span></label>)}</div>
         <footer><span><Clock3 size={15} /> {formatAppointment(job.appointment)}</span>{job.status !== 'Tamamlandı' && role !== 'musteri' && <button disabled={cannotAdvance} onClick={() => advance(job)}>{cannotAdvance ? 'Önce listeyi tamamla' : `${jobFlow[jobFlow.indexOf(job.status) + 1]} yap`} <ChevronRight size={16} /></button>}</footer>

@@ -1,4 +1,4 @@
-# Akıştan Saha
+# Tesisat Pro
 
 Doğalgaz, sıhhi tesisat ve ısı pompası firmaları için mobil uyumlu saha operasyonu MVP'si.
 
@@ -7,7 +7,9 @@ Doğalgaz, sıhhi tesisat ve ısı pompası firmaları için mobil uyumlu saha o
 - Admin, usta, proje takipçisi ve müşteri rolleri
 - Müşteri oluşturma ve arama
 - Dört adımlı hızlı keşif akışı
-- Oda ölçülerinden canlı plan önizlemesi
+- Hazır oda şablonları ve yeni oda ekleme
+- Oda bazında radyatör marka/ölçü seçimi
+- Kombi marka ve kapasite seçimi
 - Ürün kataloğundan otomatik maliyet, satış, KDV ve kâr hesabı
 - Usta randevuları ve malzeme hazırlık listeleri
 - Doğalgaz, sıhhi tesisat ve ısı pompası proje aşamaları

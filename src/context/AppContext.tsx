@@ -39,13 +39,13 @@ function useStoredState<T>(key: string, fallback: T) {
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [role, setRole] = useStoredState<Role>('akistan-role', 'admin')
-  const [customers, setCustomers] = useStoredState('akistan-customers', seedCustomers)
-  const [surveys, setSurveys] = useStoredState('akistan-surveys', seedSurveys)
-  const [products, setProducts] = useStoredState('akistan-products', seedProducts)
-  const [jobs, setJobs] = useStoredState('akistan-jobs', seedJobs)
-  const [projects, setProjects] = useStoredState('akistan-projects', seedProjects)
-  const [payments, setPayments] = useStoredState('akistan-payments', seedPayments)
+  const [role, setRole] = useStoredState<Role>('tesisat-pro-role', 'admin')
+  const [customers, setCustomers] = useStoredState('tesisat-pro-customers', seedCustomers)
+  const [surveys, setSurveys] = useStoredState('tesisat-pro-surveys', seedSurveys)
+  const [products, setProducts] = useStoredState('tesisat-pro-products', seedProducts)
+  const [jobs, setJobs] = useStoredState('tesisat-pro-jobs', seedJobs)
+  const [projects, setProjects] = useStoredState('tesisat-pro-projects', seedProjects)
+  const [payments, setPayments] = useStoredState('tesisat-pro-payments', seedPayments)
 
   const value = useMemo<AppState>(() => ({
     role,

@@ -66,7 +66,7 @@ export function Shell({ page, onNavigate, children }: { page: PageKey; onNavigat
       <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
         <div className="brand-row">
           <div className="brand-mark"><Droplets size={22} fill="currentColor" /></div>
-          <div><strong>akıştan</strong><span>saha operasyonları</span></div>
+          <div><strong>tesisat pro</strong><span>saha operasyonları</span></div>
           <button className="mobile-close icon-button" onClick={() => setMobileOpen(false)}><X size={19} /></button>
         </div>
         <nav className="side-nav" aria-label="Ana menü">
