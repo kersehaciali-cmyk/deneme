@@ -131,8 +131,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!supabase || !organizationId) return
     setSyncStatus('loading')
     try {
+      const recordsQuery = supabase.from('app_records').select('entity_type,entity_id,data').eq('organization_id', organizationId)
+      const visibleRecordsQuery = profile?.role === 'usta' || profile?.role === 'proje'
+        ? recordsQuery.neq('entity_type', 'payment')
+        : recordsQuery
       const [recordsResult, profilesResult] = await Promise.all([
-        supabase.from('app_records').select('entity_type,entity_id,data').eq('organization_id', organizationId),
+        visibleRecordsQuery,
         supabase.from('profiles').select('id,name,phone,email,role,active,organization_id,customer_id').eq('organization_id', organizationId).order('name'),
       ])
       if (recordsResult.error) throw recordsResult.error

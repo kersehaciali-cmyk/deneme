@@ -2,7 +2,7 @@ import { Camera, Check, ClipboardList, FileSpreadsheet, MapPin, Package, Phone, 
 import { useState } from 'react'
 import { workItemDefinitions } from '../data'
 import { useApp } from '../context/AppContext'
-import { formatCurrency } from '../lib/domain'
+import { canViewPrices, formatCurrency } from '../lib/domain'
 import { buildApproximateMaterials } from '../lib/materials'
 import type { ProjectMaterial } from '../types'
 import { MediaPreview } from './MediaPreview'
@@ -22,7 +22,7 @@ export function SurveyDetailModal({ surveyId, onClose }: { surveyId: string | nu
 
   const customer = customers.find((item) => item.id === survey.customerId)
   const template = templates.find((item) => item.id === survey.templateId)
-  const hidePrices = role === 'usta'
+  const hidePrices = !canViewPrices(role)
   const lineSubtotal = survey.lines.reduce((sum, line) => {
     const product = products.find((item) => item.id === line.productId)
     return sum + (line.unitSale ?? product?.sale ?? 0) * line.quantity
@@ -101,7 +101,7 @@ export function SurveyDetailModal({ surveyId, onClose }: { surveyId: string | nu
       </section>}
 
       <section className="survey-detail-section">
-        <header><div><Package size={17} /><span><strong>Fiyat verilen ürün ve hizmetler</strong><small>{survey.lines.length} satır</small></span></div></header>
+        <header><div><Package size={17} /><span><strong>Seçilen ürün ve hizmetler</strong><small>{survey.lines.length} satır</small></span></div></header>
         {survey.lines.length > 0 ? <div className="survey-detail-table-wrap"><div className={`survey-detail-table ${hidePrices ? 'without-price' : ''}`}>
           <div className="survey-detail-table-head"><span>Ürün / hizmet</span><span>Oda</span><span>Miktar</span>{!hidePrices && <><span>Birim fiyat</span><span>Tutar</span></>}</div>
           {survey.lines.map((line) => {
@@ -121,7 +121,7 @@ export function SurveyDetailModal({ surveyId, onClose }: { surveyId: string | nu
           <span className="grand"><small>Teklif toplamı</small><strong>{formatCurrency(survey.total || lineSubtotal)}</strong></span>
           {!hasSnapshotPrices && <p>Eski keşif satırlarında güncel katalog birim fiyatları gösterilir; kayıtlı teklif genel toplamı korunur.</p>}
         </div>}
-        {hidePrices && <p className="master-price-note">Usta görünümünde teklif fiyatları gizlidir.</p>}
+        {hidePrices && <p className="master-price-note">Bu kullanıcı rolünde teklif fiyatları gizlidir.</p>}
       </section>
 
       <section className="survey-detail-section survey-material-section">

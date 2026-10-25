@@ -3,12 +3,16 @@ import type { PageKey, Product, Project, Role, SurveyLine } from '../types'
 const permissions: Record<Role, PageKey[]> = {
   admin: ['dashboard', 'users', 'customers', 'surveys', 'jobs', 'projects', 'payments', 'catalog', 'reports'],
   usta: ['dashboard', 'customers', 'surveys', 'jobs', 'projects'],
-  proje: ['dashboard', 'customers', 'surveys', 'jobs', 'projects', 'payments'],
+  proje: ['dashboard', 'customers', 'surveys', 'jobs', 'projects'],
   musteri: ['dashboard', 'projects', 'payments'],
 }
 
 export function canAccess(role: Role, page: PageKey) {
   return permissions[role].includes(page)
+}
+
+export function canViewPrices(role: Role) {
+  return role === 'admin' || role === 'musteri'
 }
 
 export function calculateSurveyTotals(lines: SurveyLine[], products: Product[]) {

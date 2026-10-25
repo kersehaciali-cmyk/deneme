@@ -3,13 +3,14 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { Modal } from '../components/Modal'
 import { EntityDetailModal, type ProfileSubject } from '../components/EntityDetailModal'
 import { useApp } from '../context/AppContext'
-import { formatCurrency, initials } from '../lib/domain'
+import { canViewPrices, formatCurrency, initials } from '../lib/domain'
 
 export function Customers() {
   const { customers, addCustomer, role } = useApp()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [profile, setProfile] = useState<ProfileSubject | null>(null)
+  const showPrices = canViewPrices(role)
   const filtered = useMemo(() => customers.filter((item) => `${item.name} ${item.phone} ${item.district}`.toLocaleLowerCase('tr-TR').includes(query.toLocaleLowerCase('tr-TR'))).sort((a, b) => a.name.localeCompare(b.name, 'tr-TR')), [customers, query])
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -31,7 +32,7 @@ export function Customers() {
       {filtered.map((customer) => <article className="customer-card panel" key={customer.id}>
         <div className="customer-card-head"><div className="avatar avatar-large">{initials(customer.name)}</div><div>{role === 'admin' ? <button className="entity-name-link" onClick={() => setProfile({ kind: 'customer', id: customer.id })}>{customer.name}</button> : <h3>{customer.name}</h3>}<span>{customer.id.toUpperCase()}</span></div></div>
         <div className="contact-list"><span><Phone size={16} /> {customer.phone}</span><span><MapPin size={16} /> {customer.address}, {customer.district}</span></div>
-        <div className={`customer-stats ${role === 'usta' ? 'single' : ''}`}><div><span>Açık proje</span><strong>{customer.openProjectCount}</strong></div>{role !== 'usta' && <div><span>Kalan bakiye</span><strong>{formatCurrency(customer.balance)}</strong></div>}</div>
+        <div className={`customer-stats ${showPrices ? '' : 'single'}`}><div><span>Açık proje</span><strong>{customer.openProjectCount}</strong></div>{showPrices && <div><span>Kalan bakiye</span><strong>{formatCurrency(customer.balance)}</strong></div>}</div>
       </article>)}
       <button className="customer-add-card" onClick={() => setOpen(true)}><span><Plus /></span><strong>Yeni müşteri ekle</strong><small>İletişim ve adres bilgileriyle başlayın</small></button>
     </section>

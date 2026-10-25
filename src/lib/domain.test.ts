@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calculateSurveyTotals, canAccess, directionsUrl, isProjectClosed, projectProgress, sortNewestFirst, sortProjectsNewestFirst } from './domain'
+import { calculateSurveyTotals, canAccess, canViewPrices, directionsUrl, isProjectClosed, projectProgress, sortNewestFirst, sortProjectsNewestFirst } from './domain'
 import type { Product, Project, SurveyLine } from '../types'
 
 const products: Product[] = [
@@ -29,6 +29,14 @@ describe('domain rules', () => {
     expect(canAccess('admin', 'users')).toBe(true)
     expect(canAccess('usta', 'users')).toBe(false)
     expect(canAccess('usta', 'projects')).toBe(true)
+    expect(canAccess('proje', 'payments')).toBe(false)
+  })
+
+  it('shows financial values only to administrators and customers', () => {
+    expect(canViewPrices('admin')).toBe(true)
+    expect(canViewPrices('musteri')).toBe(true)
+    expect(canViewPrices('proje')).toBe(false)
+    expect(canViewPrices('usta')).toBe(false)
   })
 
   it('calculates stage progress', () => {

@@ -17,8 +17,9 @@ const pages: PageKey[] = ['dashboard', 'users', 'customers', 'surveys', 'jobs', 
 
 export default function App() {
   const { role } = useApp()
-  const initial = window.location.hash.replace('#/', '') as PageKey
-  const [page, setPage] = useState<PageKey>(pages.includes(initial) ? initial : 'dashboard')
+  const requestedPage = window.location.hash.replace('#/', '') as PageKey
+  const initialPage = pages.includes(requestedPage) && canAccess(role, requestedPage) ? requestedPage : 'dashboard'
+  const [page, setPage] = useState<PageKey>(initialPage)
 
   useEffect(() => {
     if (!canAccess(role, page)) setPage('dashboard')

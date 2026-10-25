@@ -1,7 +1,7 @@
 import { CalendarDays, CircleDollarSign, Mail, MapPin, Phone, UserRound, WalletCards } from 'lucide-react'
 import { useMemo } from 'react'
 import { useApp } from '../context/AppContext'
-import { formatCurrency, initials, isProjectClosed, projectProgress, sortProjectsNewestFirst } from '../lib/domain'
+import { canViewPrices, formatCurrency, initials, isProjectClosed, projectProgress, sortProjectsNewestFirst } from '../lib/domain'
 import { Modal } from './Modal'
 
 export type ProfileSubject = { kind: 'customer'; id: string } | { kind: 'user'; id: string }
@@ -10,7 +10,7 @@ const roleLabels = { admin: 'Yönetici', usta: 'Usta', proje: 'Proje takipçisi'
 const formatDate = (value?: string) => value ? new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${value}T12:00:00`)) : 'Belirlenmedi'
 
 export function EntityDetailModal({ subject, onClose }: { subject: ProfileSubject | null; onClose: () => void }) {
-  const { customers, users, projects, surveys, payments } = useApp()
+  const { customers, users, projects, surveys, payments, role } = useApp()
   const customer = subject?.kind === 'customer' ? customers.find((item) => item.id === subject.id) : undefined
   const user = subject?.kind === 'user' ? users.find((item) => item.id === subject.id) : undefined
   const relatedProjects = useMemo(() => sortProjectsNewestFirst(projects.filter((project) => {
@@ -31,6 +31,7 @@ export function EntityDetailModal({ subject, onClose }: { subject: ProfileSubjec
   const total = relatedPayments.reduce((sum, payment) => sum + payment.amount, 0)
   const collected = relatedPayments.reduce((sum, payment) => sum + payment.paid, 0)
   const balance = relatedPayments.length > 0 ? total - collected : (customer?.balance ?? 0)
+  const showFinancials = Boolean(customer) && canViewPrices(role)
 
   return <Modal open onClose={onClose} eyebrow={customer ? 'MÜŞTERİ DETAYI' : 'PERSONEL DETAYI'} title={name} wide>
     <div className="entity-detail">
@@ -44,11 +45,11 @@ export function EntityDetailModal({ subject, onClose }: { subject: ProfileSubjec
         </div>
       </section>
 
-      <section className={`entity-metrics ${customer ? 'with-finance' : ''}`}>
+      <section className={`entity-metrics ${showFinancials ? 'with-finance' : ''}`}>
         <div><UserRound /><span><strong>{relatedProjects.length}</strong> toplam proje</span></div>
         <div><span className="metric-status open" /><span><strong>{openCount}</strong> açık proje</span></div>
         <div><span className="metric-status closed" /><span><strong>{closedCount}</strong> kapalı proje</span></div>
-        {customer && <div><WalletCards /><span><strong>{formatCurrency(balance)}</strong> kalan bakiye</span></div>}
+        {showFinancials && <div><WalletCards /><span><strong>{formatCurrency(balance)}</strong> kalan bakiye</span></div>}
       </section>
 
       <section className="entity-section">
@@ -72,7 +73,7 @@ export function EntityDetailModal({ subject, onClose }: { subject: ProfileSubjec
         })}</div>}
       </section>
 
-      {customer && <section className="entity-section account-section">
+      {showFinancials && <section className="entity-section account-section">
         <header><div><span className="eyebrow">CARİ HESAP</span><h3>Cari hareketler</h3></div><div className="account-totals"><span>Toplam <b>{formatCurrency(total)}</b></span><span>Tahsil <b>{formatCurrency(collected)}</b></span></div></header>
         {relatedPayments.length === 0 ? <div className="entity-empty">Bu müşteriye ait cari hareket bulunmuyor.</div> : <div className="account-list">{relatedPayments.map((payment) => <article key={payment.id}><span className="account-icon"><CircleDollarSign size={17} /></span><div><strong>{payment.description}</strong><small>{payment.id} · Vade: {formatDate(payment.dueDate)}</small></div><div><span>Toplam<strong>{formatCurrency(payment.amount)}</strong></span><span>Tahsil<strong>{formatCurrency(payment.paid)}</strong></span><span>Kalan<strong>{formatCurrency(payment.amount - payment.paid)}</strong></span></div><em className={`status-pill status-${payment.status.toLocaleLowerCase('tr-TR')}`}>{payment.status}</em></article>)}</div>}
       </section>}

@@ -2,7 +2,7 @@ import { ArrowRight, CalendarClock, CheckCircle2, ClipboardPlus, Clock3, Package
 import { useState } from 'react'
 import { EntityDetailModal, type ProfileSubject } from '../components/EntityDetailModal'
 import { useApp } from '../context/AppContext'
-import { formatCurrency, sortProjectsNewestFirst } from '../lib/domain'
+import { canViewPrices, formatCurrency, sortProjectsNewestFirst } from '../lib/domain'
 import type { PageKey } from '../types'
 
 const appointmentDate = (value: string) => new Date(`${value.slice(0, 10)}T12:00:00`)
@@ -20,6 +20,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageKey) => void 
   const approvalProjects = sortProjectsNewestFirst(projects.filter((project) => project.stages[project.currentStage]?.toLocaleLowerCase('tr-TR').includes('onaya gönderildi'))).slice(0, 3)
   const isCustomer = role === 'musteri'
   const isMaster = role === 'usta'
+  const showPrices = canViewPrices(role)
   const openFilteredList = (page: 'jobs' | 'projects', filter: string) => {
     sessionStorage.setItem('tesisat-pro-list-filter', `${page}:${filter}`)
     onNavigate(page)
@@ -40,7 +41,11 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageKey) => void 
         {!isCustomer && <Metric icon={<UsersRound />} label="Aktif müşteri" value={String(customers.length)} note="Bu ay +3" tone="teal" />}
         <Metric icon={<CalendarClock />} label={isCustomer ? 'Aktif projem' : 'Devam eden proje'} value={String(isCustomer ? 1 : activeProjects)} note="2 proje kritik aşamada" tone="orange" />
         <Metric icon={<CheckCircle2 />} label="Tamamlanan iş" value={String(isCustomer ? 2 : completedJobs + 23)} note="Bu ay %18 artış" tone="green" />
-        {isMaster ? <Metric icon={<PackageCheck />} label="Hazırlanacak iş" value="1" note="Yarın için malzeme listesi" tone="berry" /> : <Metric icon={<WalletCards />} label="Bekleyen tahsilat" value={formatCurrency(isCustomer ? 48500 : outstanding)} note="1 vadesi geçmiş" tone="berry" />}
+        {showPrices
+          ? <Metric icon={<WalletCards />} label="Bekleyen tahsilat" value={formatCurrency(isCustomer ? 48500 : outstanding)} note="1 vadesi geçmiş" tone="berry" />
+          : isMaster
+            ? <Metric icon={<PackageCheck />} label="Hazırlanacak iş" value="1" note="Yarın için malzeme listesi" tone="berry" />
+            : <Metric icon={<Clock3 />} label="Onay bekleyen" value={String(approvalProjects.length)} note="Takip edilecek proje" tone="berry" />}
       </section>
 
       <section className="dashboard-grid">
@@ -65,12 +70,12 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageKey) => void 
         </article>
 
         <article className="panel attention-panel">
-          <div className="panel-heading"><div><span className="eyebrow">DİKKAT GEREKTİREN</span><h2>Bugünün notları</h2></div><span className="round-count">{isMaster ? 2 : 3}</span></div>
+          <div className="panel-heading"><div><span className="eyebrow">DİKKAT GEREKTİREN</span><h2>Bugünün notları</h2></div><span className="round-count">{showPrices ? 3 : 2}</span></div>
           <button className="attention-card" onClick={() => onNavigate('jobs')}>
             <span className="attention-icon amber"><Clock3 size={19} /></span>
             <span><strong>Malzeme hazırlığı eksik</strong><small>IS-284 · Yarın</small></span><ArrowRight size={17} />
           </button>
-          {!isMaster && <button className="attention-card" onClick={() => onNavigate('payments')}>
+          {showPrices && <button className="attention-card" onClick={() => onNavigate('payments')}>
             <span className="attention-icon red"><WalletCards size={19} /></span>
             <span><strong>Vadesi geçen ödeme</strong><small>Murat Demir · 18.750 ₺</small></span><ArrowRight size={17} />
           </button>}
