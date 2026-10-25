@@ -59,6 +59,7 @@ export interface Survey {
   latitude?: number
   longitude?: number
   attachments?: SurveyAttachment[]
+  materials?: ProjectMaterial[]
 }
 
 export interface SurveyAttachment {

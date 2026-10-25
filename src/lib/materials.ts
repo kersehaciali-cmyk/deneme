@@ -13,15 +13,22 @@ export function buildApproximateMaterials(survey: Survey | undefined, template: 
     prepared: false,
   }))
 
+  const surveyedProducts = new Map<string, { lineId: string; quantity: number }>()
   survey?.lines.forEach((line) => {
     const product = products.find((item) => item.id === line.productId)
     if (product?.group === 'İşçilik') return
-    const existingIndex = materials.findIndex((item) => item.productId === line.productId)
+    const current = surveyedProducts.get(line.productId)
+    surveyedProducts.set(line.productId, { lineId: current?.lineId ?? line.id, quantity: (current?.quantity ?? 0) + line.quantity })
+  })
+
+  surveyedProducts.forEach(({ lineId, quantity }, productId) => {
+    const product = products.find((item) => item.id === productId)
+    const existingIndex = materials.findIndex((item) => item.productId === productId)
     const material: ProjectMaterial = {
-      id: `mat-survey-${line.id}`,
-      productId: line.productId,
-      label: product ? `${product.name}${product.variant ? ` · ${product.variant}` : ''}` : line.productId,
-      quantity: line.quantity,
+      id: `mat-survey-${lineId}`,
+      productId,
+      label: product ? `${product.name}${product.variant ? ` · ${product.variant}` : ''}` : productId,
+      quantity,
       unit: product?.unit ?? 'adet',
       prepared: false,
     }

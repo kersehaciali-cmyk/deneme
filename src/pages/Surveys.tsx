@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Camera, Check, ClipboardPenLine, Flame, Image, LocateFixed, MapPin, Plus, Search, ShowerHead, Snowflake, ThermometerSun, Trash2, UserRoundPlus, Wind } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Camera, Check, ClipboardPenLine, Copy, Flame, Image, LocateFixed, MapPin, Plus, Search, ShowerHead, Snowflake, ThermometerSun, Trash2, UserRoundPlus, Wind } from 'lucide-react'
 import { useMemo, useState, type ChangeEvent } from 'react'
 import { Modal } from '../components/Modal'
 import { EntityDetailModal, type ProfileSubject } from '../components/EntityDetailModal'
@@ -7,7 +7,9 @@ import { SurveyDetailModal } from '../components/SurveyDetailModal'
 import { workItemDefinitions } from '../data'
 import { useApp } from '../context/AppContext'
 import { calculateSurveyTotals, formatCurrency, sortNewestFirst } from '../lib/domain'
+import { buildApproximateMaterials } from '../lib/materials'
 import { deleteMediaFile, saveMediaFile } from '../lib/mediaStore'
+import { createSurveyCopyDraft } from '../lib/surveyCopy'
 import type { Product, Role, Room, Survey, SurveyAttachment, SurveyLine, SurveyStatus, SurveyTemplate, SurveyType } from '../types'
 
 const typeOptions: { value: SurveyType; description: string; icon: typeof Flame; className: string }[] = [
@@ -113,6 +115,9 @@ function SurveyWizard({ open, onClose }: { open: boolean; onClose: () => void })
   const [step, setStep] = useState(1)
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? '')
   const [customerQuery, setCustomerQuery] = useState('')
+  const [copyPickerOpen, setCopyPickerOpen] = useState(false)
+  const [copyQuery, setCopyQuery] = useState('')
+  const [copiedSurveyId, setCopiedSurveyId] = useState<string | null>(null)
   const [showNewCustomer, setShowNewCustomer] = useState(false)
   const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', district: '', address: '' })
   const [site, setSite] = useState({
@@ -150,6 +155,10 @@ function SurveyWizard({ open, onClose }: { open: boolean; onClose: () => void })
   const radiatorKey = type === 'Isı Pompası' ? 'radyator-ip' : 'radyator-dg'
   const hasRadiators = workItemKeys.includes(radiatorKey)
   const filteredCustomers = customers.filter((customer) => `${customer.name} ${customer.phone} ${customer.district}`.toLocaleLowerCase('tr-TR').includes(customerQuery.toLocaleLowerCase('tr-TR'))).sort((a, b) => a.name.localeCompare(b.name, 'tr-TR'))
+  const copyCandidates = sortNewestFirst(surveys.filter((survey) => {
+    const customer = customers.find((item) => item.id === survey.customerId)
+    return `${survey.id} ${survey.type} ${customer?.name ?? ''}`.toLocaleLowerCase('tr-TR').includes(copyQuery.toLocaleLowerCase('tr-TR'))
+  }))
   const availableProducts = products.filter((product) => {
     if (product.group === 'Kombi' || product.group === 'Radyatör' || product.group === 'Isı Pompası' || product.group === 'Klima') return false
     if (product.group === 'İşçilik') return true
@@ -159,7 +168,10 @@ function SurveyWizard({ open, onClose }: { open: boolean; onClose: () => void })
 
   const generatedLines = useMemo<SurveyLine[]>(() => {
     const result: SurveyLine[] = []
-    if (hasRadiators) rooms.forEach((room) => room.radiatorProductId && result.push({ id: `radiator-${room.id}`, roomId: room.id, productId: room.radiatorProductId, quantity: room.radiatorQuantity ?? 1 }))
+    if (hasRadiators) rooms.forEach((room) => {
+      const quantity = room.radiatorQuantity ?? 0
+      if (room.radiatorProductId && quantity > 0) result.push({ id: `radiator-${room.id}`, roomId: room.id, productId: room.radiatorProductId, quantity })
+    })
     if (type === 'Doğalgaz' && workItemKeys.includes('kombi') && boilerProductId) result.push({ id: 'selected-boiler', roomId: rooms[0]?.id ?? '', productId: boilerProductId, quantity: 1 })
     if (type === 'Isı Pompası' && workItemKeys.includes('isi-pompasi') && heatPumpProductId) result.push({ id: 'selected-heat-pump', roomId: rooms[0]?.id ?? '', productId: heatPumpProductId, quantity: 1 })
     if (type === 'Klima' && workItemKeys.includes('klima') && acProductId) result.push({ id: 'selected-ac', roomId: rooms[0]?.id ?? '', productId: acProductId, quantity: 1 })
@@ -167,8 +179,6 @@ function SurveyWizard({ open, onClose }: { open: boolean; onClose: () => void })
   }, [acProductId, boilerProductId, hasRadiators, heatPumpProductId, rooms, type, workItemKeys])
   const effectiveLines = useMemo(() => [...lines, ...generatedLines], [generatedLines, lines])
   const totals = useMemo(() => calculateSurveyTotals(effectiveLines, products), [effectiveLines, products])
-  const vat = totals.sale * .2
-  const grandTotal = totals.sale + vat
 
   const chooseType = (nextType: SurveyType) => {
     const template = templates.find((item) => item.type === nextType)
@@ -176,6 +186,7 @@ function SurveyWizard({ open, onClose }: { open: boolean; onClose: () => void })
     setTemplateId(template?.id ?? '')
     setWorkItemKeys(template?.workItemKeys ?? [])
     setLines([])
+    setCopiedSurveyId(null)
   }
   const chooseTemplate = (id: string) => {
     const template = templates.find((item) => item.id === id)
@@ -199,6 +210,9 @@ function SurveyWizard({ open, onClose }: { open: boolean; onClose: () => void })
     setCustomerId(customer?.id ?? '')
     setSite({ address: customer ? `${customer.address}${customer.district ? `, ${customer.district}` : ''}` : '', contactName: customer?.name ?? '', contactPhone: customer?.phone ?? '', latitude: '', longitude: '' })
     setCustomerQuery('')
+    setCopyQuery('')
+    setCopyPickerOpen(false)
+    setCopiedSurveyId(null)
     setShowNewCustomer(false)
     setLocationState('idle')
     setSurveyPhotos([])
@@ -222,6 +236,21 @@ function SurveyWizard({ open, onClose }: { open: boolean; onClose: () => void })
     setNewCustomer({ name: '', phone: '', district: '', address: '' })
     setCustomerQuery('')
     setShowNewCustomer(false)
+  }
+  const applySurveyCopy = (source: Survey) => {
+    const draft = createSurveyCopyDraft(source, products)
+    setType(draft.type)
+    setTemplateId(draft.templateId || templates.find((item) => item.type === draft.type)?.id || '')
+    setWorkItemKeys(draft.workItemKeys)
+    setRooms(draft.rooms.length > 0 ? draft.rooms : createDefaultRooms())
+    setLines(draft.lines)
+    setBoilerProductId(draft.boilerProductId ?? products.find((product) => product.group === 'Kombi')?.id ?? '')
+    setHeatPumpProductId(draft.heatPumpProductId ?? products.find((product) => product.group === 'Isı Pompası')?.id ?? '')
+    setAcProductId(draft.acProductId ?? products.find((product) => product.group === 'Klima')?.id ?? '')
+    if (draft.defaultRadiatorBrand) setDefaultRadiatorBrand(draft.defaultRadiatorBrand)
+    setCopiedSurveyId(source.id)
+    setCopyPickerOpen(false)
+    setCopyQuery('')
   }
   const captureLocation = () => {
     if (!navigator.geolocation) {
@@ -278,17 +307,28 @@ function SurveyWizard({ open, onClose }: { open: boolean; onClose: () => void })
       const product = products.find((item) => item.id === line.productId)
       return { ...line, unitCost: product?.cost, unitSale: product?.sale }
     })
-    addSurvey({ id: `KSF-${Date.now()}`, customerId, type, status: role === 'usta' ? 'Taslak' : 'Fiyatlandırıldı', rooms: hasRadiators ? rooms : [], lines: pricedLines, templateId, workItemKeys, total: grandTotal, createdAt: new Date().toISOString().slice(0, 10), owner: currentUser.name, siteAddress: site.address.trim(), siteContactName: site.contactName.trim(), siteContactPhone: site.contactPhone.trim(), latitude: Number.isFinite(latitude) ? latitude : undefined, longitude: Number.isFinite(longitude) ? longitude : undefined, attachments: surveyPhotos })
+    const survey: Survey = { id: `KSF-${Date.now()}`, customerId, type, status: role === 'usta' ? 'Taslak' : 'Fiyatlandırıldı', rooms: hasRadiators ? rooms : [], lines: pricedLines, templateId, workItemKeys, total: totals.sale, createdAt: new Date().toISOString(), owner: currentUser.name, siteAddress: site.address.trim(), siteContactName: site.contactName.trim(), siteContactPhone: site.contactPhone.trim(), latitude: Number.isFinite(latitude) ? latitude : undefined, longitude: Number.isFinite(longitude) ? longitude : undefined, attachments: surveyPhotos }
+    survey.materials = buildApproximateMaterials(survey, templates.find((item) => item.id === templateId), products)
+    addSurvey(survey)
     resetAndClose(true)
   }
 
   return <Modal open={open} onClose={resetAndClose} eyebrow="HIZLI KEŞİF" title="Yeni keşif oluştur" wide>
     <div className="wizard-progress">{['Müşteri & tür', 'Şablon & işler', 'Seçimler & metraj', 'Teklif özeti'].map((label, index) => <div className={step >= index + 1 ? 'active' : ''} key={label}><span>{step > index + 1 ? <Check size={15} /> : index + 1}</span><strong>{label}</strong></div>)}</div>
     <div className="wizard-body">
-      {step === 1 && <div className="wizard-section"><div className="section-title"><span>01</span><div><h3>Müşteri ve keşif türü</h3><p>Ödeme müşterisini ve uygulamanın yapılacağı yeri ayrı kaydedin.</p></div></div><div className="customer-picker-head"><label><Search size={17} /><input value={customerQuery} onChange={(event) => setCustomerQuery(event.target.value)} placeholder="İsim, telefon veya ilçe ile müşteri ara…" /></label><button className="primary-button" onClick={() => setShowNewCustomer((value) => !value)}><UserRoundPlus size={17} /> Yeni Müşteri</button></div>{showNewCustomer && <div className="new-customer-inline"><label><span>Ad soyad *</span><input value={newCustomer.name} onChange={(event) => setNewCustomer({ ...newCustomer, name: event.target.value })} /></label><label><span>Telefon *</span><input value={newCustomer.phone} onChange={(event) => setNewCustomer({ ...newCustomer, phone: event.target.value })} /></label><label><span>İlçe</span><input value={newCustomer.district} onChange={(event) => setNewCustomer({ ...newCustomer, district: event.target.value })} /></label><label><span>Adres</span><input value={newCustomer.address} onChange={(event) => setNewCustomer({ ...newCustomer, address: event.target.value })} /></label><button disabled={!newCustomer.name.trim() || !newCustomer.phone.trim()} onClick={createCustomer}><Check size={16} /> Kaydet ve seç</button></div>}<div className="customer-results">{filteredCustomers.slice(0, 6).map((customer) => <button className={customerId === customer.id ? 'selected' : ''} onClick={() => selectCustomer(customer)} key={customer.id}><span>{customer.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</span><div><strong>{customer.name}</strong><small>{customer.phone} · {customer.district}</small></div>{customerId === customer.id && <Check size={16} />}</button>)}</div><SiteDetailsEditor site={site} setSite={setSite} locationState={locationState} captureLocation={captureLocation} /><span className="choice-label">YAPILACAK KEŞİF İŞLEMİ</span><div className="type-choice-grid four">{typeOptions.map(({ value, description, icon: Icon, className }) => <button className={type === value ? 'selected' : ''} onClick={() => chooseType(value)} key={value}><span className={`type-icon ${className}`}><Icon /></span><strong>{value}</strong><small>{description}</small><i>{type === value && <Check size={14} />}</i></button>)}</div></div>}
+      {step === 1 && <div className="wizard-section">
+        <div className="section-title"><span>01</span><div><h3>Müşteri ve keşif türü</h3><p>Yeni seçim yapın veya eski bir keşfin içeriğini kopyalayarak başlayın.</p></div></div>
+        <div className="customer-picker-head"><label><Search size={17} /><input value={customerQuery} onChange={(event) => setCustomerQuery(event.target.value)} placeholder="İsim, telefon veya ilçe ile müşteri ara…" /></label><button className="secondary-button survey-copy-button" onClick={() => setCopyPickerOpen((value) => !value)}><Copy size={17} /> Keşif bul</button><button className="primary-button" onClick={() => setShowNewCustomer((value) => !value)}><UserRoundPlus size={17} /> Yeni Müşteri</button></div>
+        {showNewCustomer && <div className="new-customer-inline"><label><span>Ad soyad *</span><input value={newCustomer.name} onChange={(event) => setNewCustomer({ ...newCustomer, name: event.target.value })} /></label><label><span>Telefon *</span><input value={newCustomer.phone} onChange={(event) => setNewCustomer({ ...newCustomer, phone: event.target.value })} /></label><label><span>İlçe</span><input value={newCustomer.district} onChange={(event) => setNewCustomer({ ...newCustomer, district: event.target.value })} /></label><label><span>Adres</span><input value={newCustomer.address} onChange={(event) => setNewCustomer({ ...newCustomer, address: event.target.value })} /></label><button disabled={!newCustomer.name.trim() || !newCustomer.phone.trim()} onClick={createCustomer}><Check size={16} /> Kaydet ve seç</button></div>}
+        <div className="customer-results">{filteredCustomers.slice(0, 6).map((customer) => <button className={customerId === customer.id ? 'selected' : ''} onClick={() => selectCustomer(customer)} key={customer.id}><span>{customer.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</span><div><strong>{customer.name}</strong><small>{customer.phone} · {customer.district}</small></div>{customerId === customer.id && <Check size={16} />}</button>)}</div>
+        {copyPickerOpen && <section className="survey-copy-picker"><header><div><Copy size={17} /><span><strong>Mevcut keşiften aktar</strong><small>Yalnız iş kalemleri, odalar, ürünler ve miktarlar kopyalanır. Müşteri ve saha bilgileri değişmez.</small></span></div><label><Search size={15} /><input autoFocus value={copyQuery} onChange={(event) => setCopyQuery(event.target.value)} placeholder="Keşif no, müşteri veya tür ara…" /></label></header><div>{copyCandidates.slice(0, 8).map((source) => { const sourceCustomer = customers.find((item) => item.id === source.customerId); return <button key={source.id} onClick={() => applySurveyCopy(source)}><span><strong>{source.id} · {source.type}</strong><small>{sourceCustomer?.name ?? 'Müşteri bulunamadı'} · {new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(source.createdAt))}</small></span><b>Aktar <ArrowRight size={13} /></b></button> })}{copyCandidates.length === 0 && <p>Aramanıza uygun keşif bulunamadı.</p>}</div></section>}
+        {copiedSurveyId && <div className="survey-copy-success"><Check size={15} /><span><strong>{copiedSurveyId}</strong> içeriği aktarıldı. Müşteri ve uygulama adresi bu yeni keşfe aittir.</span></div>}
+        <SiteDetailsEditor site={site} setSite={setSite} locationState={locationState} captureLocation={captureLocation} />
+        <span className="choice-label">YAPILACAK KEŞİF İŞLEMİ</span><div className="type-choice-grid four">{typeOptions.map(({ value, description, icon: Icon, className }) => <button className={type === value ? 'selected' : ''} onClick={() => chooseType(value)} key={value}><span className={`type-icon ${className}`}><Icon /></span><strong>{value}</strong><small>{description}</small><i>{type === value && <Check size={14} />}</i></button>)}</div>
+      </div>}
       {step === 2 && <div className="wizard-section"><div className="section-title"><span>02</span><div><h3>Şablon ve yapılacak işler</h3><p>Şablon başlangıç seçimini yapar; aşağıdaki kalemleri serbestçe değiştirebilirsiniz.</p></div></div><label className="template-select"><span>Hazır şablon</span><select value={templateId} onChange={(event) => chooseTemplate(event.target.value)}>{typeTemplates.map((template) => <option value={template.id} key={template.id}>{template.name}</option>)}</select><small>{selectedTemplate?.workItemKeys.length ?? 0} hazır iş kalemi</small></label><div className="work-item-grid">{typeWorkItems.map((item) => <button className={workItemKeys.includes(item.key) ? 'selected' : ''} onClick={() => toggleWorkItem(item.key)} key={item.key}><span>{workItemKeys.includes(item.key) && <Check size={14} />}</span><div><strong>{item.label}</strong><small>{item.description}</small></div></button>)}</div><p className="template-note">Seçimler bu keşfe özeldir; şablonun aslı değişmez. Kalıcı şablon düzenlemelerini “Ürün & fiyatlar” ekranından yapabilirsiniz.</p></div>}
       {step === 3 && <div className="wizard-section"><div className="section-title"><span>03</span><div><h3>Ürün, ölçü ve metrajlar</h3><p>Seçili iş kalemlerinin ürünlerini ve miktarlarını belirleyin.</p></div></div>{workItemKeys.includes('kombi') && <DeviceSelector title="Kombi" hint="Marka ve kapasite" icon={<Flame size={19} />} products={boilerProducts} selected={selectedBoiler} onSelect={(id) => setBoilerProductId(id)} hidePrices={hidePrices} />}{workItemKeys.includes('isi-pompasi') && <DeviceSelector title="Isı pompası" hint="Marka ve kapasite" icon={<Wind size={19} />} products={heatPumpProducts} selected={selectedHeatPump} onSelect={(id) => setHeatPumpProductId(id)} hidePrices={hidePrices} />}{workItemKeys.includes('klima') && <DeviceSelector title="Klima" hint="Marka ve BTU gücü" icon={<Snowflake size={19} />} products={acProducts} selected={selectedAc} onSelect={(id) => setAcProductId(id)} hidePrices={hidePrices} />}{hasRadiators && <RoomRadiators rooms={rooms} products={radiatorProducts} defaultBrand={defaultRadiatorBrand} onDefaultBrandChange={changeDefaultRadiatorBrand} hidePrices={hidePrices} addingRoom={addingRoom} newRoomName={newRoomName} setAddingRoom={setAddingRoom} setNewRoomName={setNewRoomName} addRoom={addRoom} updateRoom={updateRoom} selectPart={selectRadiatorPart} removeRoom={(id) => setRooms((current) => current.filter((room) => room.id !== id))} />} {availableProducts.length > 0 && <><span className="choice-label">MALZEME, METRAJ VE İŞÇİLİK</span><div className="product-picker">{availableProducts.map((product) => { const line = lines.find((item) => item.productId === product.id); return <div className={`picker-row ${hidePrices ? 'without-price' : ''}`} key={product.id}><div><span>{product.code}</span><strong>{product.name}</strong><small>{product.variant ?? product.unit}{!hidePrices && ` · ${formatCurrency(product.sale)} / ${product.unit}`}</small></div><div className="quantity-input"><button onClick={() => setQuantity(product.id, (line?.quantity ?? 0) - 1)}>−</button><input type="number" min="0" value={line?.quantity ?? 0} onChange={(event) => setQuantity(product.id, Number(event.target.value))} /><button onClick={() => setQuantity(product.id, (line?.quantity ?? 0) + 1)}>+</button><small>{product.unit}</small></div>{!hidePrices && <b>{formatCurrency((line?.quantity ?? 0) * product.sale)}</b>}</div> })}</div></>}<SurveyPhotoEditor attachments={surveyPhotos} onUpload={uploadSurveyPhotos} onDescription={(id, description) => setSurveyPhotos((current) => current.map((photo) => photo.id === id ? { ...photo, description } : photo))} onRemove={(id) => { void deleteMediaFile(id).catch(() => undefined); setSurveyPhotos((current) => current.filter((photo) => photo.id !== id)) }} /><div className="inline-total"><span>{effectiveLines.length} malzeme/hizmet satırı · {surveyPhotos.length} keşif fotoğrafı</span>{!hidePrices && <><span>Alış toplamı {formatCurrency(totals.cost)}</span><strong>Satış toplamı {formatCurrency(totals.sale)}</strong></>}</div></div>}
-      {step === 4 && <div className={`summary-grid ${hidePrices ? 'no-price-summary' : ''}`}><div className="quote-summary"><div className="section-title"><span>04</span><div><h3>Keşif ve teklif özeti</h3><p>Kaydetmeden önce bilgileri kontrol edin.</p></div></div><dl><div><dt>Ödeme müşterisi</dt><dd>{customers.find((item) => item.id === customerId)?.name}</dd></div><div><dt>Uygulama adresi</dt><dd>{site.address}</dd></div><div><dt>Saha iletişimi</dt><dd>{site.contactName} · {site.contactPhone}</dd></div><div><dt>Konum</dt><dd>{site.latitude && site.longitude ? `${site.latitude}, ${site.longitude}` : 'Adres kullanılacak'}</dd></div><div><dt>Keşif fotoğrafları</dt><dd>{surveyPhotos.length}</dd></div><div><dt>Keşif</dt><dd>{type} · {selectedTemplate?.name}</dd></div><div><dt>Yapılacak işler</dt><dd>{workItemKeys.length} kalem</dd></div><div><dt>Malzeme/hizmet</dt><dd>{effectiveLines.length} satır</dd></div>{hasRadiators && <div><dt>Radyatörler</dt><dd>{rooms.filter((room) => room.radiatorProductId).length} oda</dd></div>}</dl><div className="selected-work-tags">{workItemKeys.map((key) => <span key={key}>{workItemDefinitions.find((item) => item.key === key)?.label}</span>)}</div>{hidePrices && <div className="master-price-note">Usta görünümünde fiyatlar gizlidir. Keşif yönetici fiyatlandırması için taslak kaydedilir.</div>}</div>{!hidePrices && <div className="price-card"><span>TEKLİF HESABI</span><div><small>Satış tutarı</small><strong>{formatCurrency(totals.sale)}</strong></div><div><small>KDV (%20)</small><strong>{formatCurrency(vat)}</strong></div><hr /><div className="grand-total"><small>Genel toplam</small><strong>{formatCurrency(grandTotal)}</strong></div><p>Alış: <b>{formatCurrency(totals.cost)}</b> · Brüt kâr: <b>{formatCurrency(totals.sale - totals.cost)}</b></p></div>}</div>}
+      {step === 4 && <div className={`summary-grid ${hidePrices ? 'no-price-summary' : ''}`}><div className="quote-summary"><div className="section-title"><span>04</span><div><h3>Keşif ve teklif özeti</h3><p>Kaydetmeden önce bilgileri kontrol edin.</p></div></div><dl><div><dt>Ödeme müşterisi</dt><dd>{customers.find((item) => item.id === customerId)?.name}</dd></div><div><dt>Uygulama adresi</dt><dd>{site.address}</dd></div><div><dt>Saha iletişimi</dt><dd>{site.contactName} · {site.contactPhone}</dd></div><div><dt>Konum</dt><dd>{site.latitude && site.longitude ? `${site.latitude}, ${site.longitude}` : 'Adres kullanılacak'}</dd></div><div><dt>Keşif fotoğrafları</dt><dd>{surveyPhotos.length}</dd></div><div><dt>Keşif</dt><dd>{type} · {selectedTemplate?.name}</dd></div><div><dt>Yapılacak işler</dt><dd>{workItemKeys.length} kalem</dd></div><div><dt>Malzeme/hizmet</dt><dd>{effectiveLines.length} satır</dd></div>{hasRadiators && <div><dt>Radyatörler</dt><dd>{rooms.filter((room) => (room.radiatorQuantity ?? 0) > 0).length} oda</dd></div>}</dl><div className="selected-work-tags">{workItemKeys.map((key) => <span key={key}>{workItemDefinitions.find((item) => item.key === key)?.label}</span>)}</div>{hidePrices && <div className="master-price-note">Usta görünümünde fiyatlar gizlidir. Keşif yönetici fiyatlandırması için taslak kaydedilir.</div>}</div>{!hidePrices && <div className="price-card"><span>TEKLİF FİYATI</span><div className="grand-total"><small>Müşteriye sunulacak toplam</small><strong>{formatCurrency(totals.sale)}</strong></div><p>İç hesap: alış <b>{formatCurrency(totals.cost)}</b> · brüt kâr <b>{formatCurrency(totals.sale - totals.cost)}</b></p></div>}</div>}
     </div>
     <footer className="wizard-footer"><button className="secondary-button" onClick={() => step === 1 ? resetAndClose() : setStep((value) => value - 1)}>{step > 1 && <ArrowLeft size={17} />}{step === 1 ? 'Vazgeç' : 'Geri'}</button>{step < 4 ? <button className="primary-button" disabled={!customerId || (step === 1 && (!site.address.trim() || !site.contactName.trim() || !site.contactPhone.trim())) || (step === 2 && workItemKeys.length === 0) || (step === 3 && effectiveLines.length === 0)} onClick={() => setStep((value) => value + 1)}>Devam et <ArrowRight size={17} /></button> : <button className="primary-button" onClick={save}><Check size={17} /> Keşfi kaydet</button>}</footer>
   </Modal>
@@ -347,29 +387,29 @@ function RoomRadiators({ rooms, products, defaultBrand, onDefaultBrandChange, hi
   const totalCm = rooms.reduce((sum, room) => {
     const product = products.find((item) => item.id === room.radiatorProductId)
     const size = Number(product?.variant?.match(/\d+/)?.[0] ?? 0)
-    return sum + size * (room.radiatorQuantity ?? 1)
+    return sum + size * (room.radiatorQuantity ?? 0)
   }, 0)
-  const toggleRoomRadiator = (room: Room, enabled: boolean) => {
+  const changeRoomQuantity = (room: Room, value: number) => {
     const defaultProduct = products.find((product) => product.brand === defaultBrand) ?? products[0]
     updateRoom(room.id, {
-      radiatorProductId: enabled ? defaultProduct?.id : undefined,
-      radiatorQuantity: enabled ? (room.radiatorQuantity ?? 1) : undefined,
+      radiatorProductId: room.radiatorProductId ?? defaultProduct?.id,
+      radiatorQuantity: Math.max(0, value),
     })
   }
   return <div className="radiator-section">
     <div className="radiator-section-head"><div><ThermometerSun size={18} /><span><strong>Radyatör</strong><small>Markayı bir kez seçin, oda ölçülerini hızla girin.</small></span></div><b>Toplam: {totalCm} cm</b></div>
     <div className="radiator-default-brand"><label><span>Varsayılan marka</span><select value={defaultBrand} onChange={(event) => onDefaultBrandChange(event.target.value)}>{brands.map((brand) => <option value={brand} key={brand}>{brand}</option>)}</select></label><p>Yeni seçilen odalara bu marka uygulanır. İsterseniz aşağıda oda bazında değiştirebilirsiniz.</p></div>
-    <div className={`radiator-list-head ${hidePrices ? 'without-price' : ''}`}><span>Oda</span><span>Radyatör</span><span>Marka</span><span>Ölçü</span><span>Adet</span>{!hidePrices && <span>Tutar</span>}<span /></div>
+    <div className={`radiator-list-head ${hidePrices ? 'without-price' : ''}`}><span>Oda adı (düzenlenebilir)</span><span>Marka</span><span>Ölçü</span><span>Adet</span>{!hidePrices && <span>Tutar</span>}<span /></div>
     <div className={`ready-room-grid ${hidePrices ? 'without-price' : ''}`}>{rooms.map((room, index) => {
-      const selected = products.find((product) => product.id === room.radiatorProductId)
+      const selected = products.find((product) => product.id === room.radiatorProductId) ?? products.find((product) => product.brand === defaultBrand) ?? products[0]
       const sizes = [...new Set(products.flatMap((product) => product.brand === selected?.brand && product.variant ? [product.variant] : []))]
-      return <article className={selected ? 'has-radiator' : ''} key={room.id}>
-        <div className="radiator-room-name"><span>{index + 1}</span><input aria-label={`${room.name} oda adı`} value={room.name} onChange={(event) => updateRoom(room.id, { name: event.target.value })} /></div>
-        <label className="radiator-room-toggle"><input type="checkbox" checked={Boolean(selected)} onChange={(event) => toggleRoomRadiator(room, event.target.checked)} /><span>{selected ? 'Var' : 'Yok'}</span></label>
-        <label className="radiator-cell"><span>Marka</span><select aria-label={`${room.name} radyatör markası`} disabled={!selected} value={selected?.brand ?? defaultBrand} onChange={(event) => selectPart(room, 'brand', event.target.value)}>{brands.map((brand) => <option value={brand} key={brand}>{brand}</option>)}</select></label>
-        <label className="radiator-cell"><span>Ölçü</span><select aria-label={`${room.name} radyatör ölçüsü`} disabled={!selected} value={selected?.variant ?? ''} onChange={(event) => selectPart(room, 'variant', event.target.value)}>{sizes.map((size) => <option value={size} key={size}>{size}</option>)}</select></label>
-        <label className="radiator-cell radiator-quantity"><span>Adet</span><input aria-label={`${room.name} radyatör adedi`} type="number" min="1" disabled={!selected} value={selected ? (room.radiatorQuantity ?? 1) : 1} onChange={(event) => updateRoom(room.id, { radiatorQuantity: Math.max(1, Number(event.target.value)) })} /></label>
-        {!hidePrices && <small className="radiator-price">{selected ? formatCurrency(selected.sale * (room.radiatorQuantity ?? 1)) : '—'}</small>}
+      const quantity = room.radiatorQuantity ?? 0
+      return <article className={quantity > 0 ? 'has-radiator' : ''} key={room.id}>
+        <div className="radiator-room-name"><span>{index + 1}</span><input aria-label={`${room.name} oda adı`} title="Oda adını değiştirmek için tıklayın" value={room.name} onChange={(event) => updateRoom(room.id, { name: event.target.value })} /></div>
+        <label className="radiator-cell"><span>Marka</span><select aria-label={`${room.name} radyatör markası`} value={selected?.brand ?? defaultBrand} onChange={(event) => selectPart(room, 'brand', event.target.value)}>{brands.map((brand) => <option value={brand} key={brand}>{brand}</option>)}</select></label>
+        <label className="radiator-cell"><span>Ölçü</span><select aria-label={`${room.name} radyatör ölçüsü`} value={selected?.variant ?? ''} onChange={(event) => selectPart(room, 'variant', event.target.value)}>{sizes.map((size) => <option value={size} key={size}>{size}</option>)}</select></label>
+        <label className="radiator-cell radiator-quantity"><span>Adet</span><input aria-label={`${room.name} radyatör adedi`} type="number" min="0" value={quantity} onChange={(event) => changeRoomQuantity(room, Number(event.target.value))} /></label>
+        {!hidePrices && <small className="radiator-price">{quantity > 0 && selected ? formatCurrency(selected.sale * quantity) : '—'}</small>}
         <button className="radiator-remove" aria-label={`${room.name} odasını sil`} onClick={() => removeRoom(room.id)}><Trash2 size={15} /></button>
       </article>
     })}</div>

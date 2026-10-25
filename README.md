@@ -12,7 +12,7 @@ Doğalgaz, ısı pompası, sıhhi tesisat ve klima firmaları için internet ba�
 
 Uygulama Supabase üzerinde çalışır:
 
-- Her kullanıcıya ayrı e-posta ve şifre
+- Her kullanıcıya ayrı telefon numarası ve şifre; e-posta isteğe bağlı
 - Yönetici, usta, proje takipçisi ve müşteri yetkileri
 - E-postayla şifre yenileme
 - Yönetici tarafından kullanıcı daveti, rol/aktiflik ve şifre yönetimi
@@ -22,6 +22,9 @@ Uygulama Supabase üzerinde çalışır:
 - Şirket ve rol bazlı veritabanı güvenlik kuralları
 - Keşif ve şablondan otomatik yaklaşık malzeme listesi
 - Usta/yönetici malzeme düzenleme ve checklist PDF/Excel çıktısı
+- Keşif kopyalama, düzenlenebilir oda/radyatör seçimleri ve mobil uyumlu hızlı keşif
+- Fiyat kataloğunu Excel uyumlu dosyayla toplu indirme ve güncelleme
+- Yönetici için toplu personel oluşturma ve güvenli proje sıfırlama araçları
 
 Şifreler uygulama kayıtlarında tutulmaz. Kimlik doğrulama servisi tarafından güvenli biçimde yönetilir. Supabase `service_role` anahtarı hiçbir zaman masaüstü, web veya mobil uygulamanın `.env` dosyasına yazılmamalıdır.
 

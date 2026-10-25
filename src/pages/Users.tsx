@@ -1,16 +1,20 @@
-import { Edit3, KeyRound, LoaderCircle, Plus, Search, ShieldCheck, UserCheck, UserX } from 'lucide-react'
+import { Edit3, KeyRound, LoaderCircle, Plus, Search, ShieldCheck, Upload, UserCheck, UserX } from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
 import { Modal } from '../components/Modal'
 import { EntityDetailModal, type ProfileSubject } from '../components/EntityDetailModal'
-import { useApp } from '../context/AppContext'
+import { useApp, type BulkUserEntry, type BulkUserResult } from '../context/AppContext'
 import { initials } from '../lib/domain'
 import type { AppUser, Customer, Role } from '../types'
 
 const roleLabels: Record<Role, string> = { admin: 'Yönetici', usta: 'Usta', proje: 'Proje takipçisi', musteri: 'Müşteri' }
 const emptyUser: Omit<AppUser, 'id'> = { name: '', phone: '', email: '', role: 'usta', active: true }
+const bulkRoleAliases: Record<string, Role> = {
+  admin: 'admin', yönetici: 'admin', yonetici: 'admin', usta: 'usta', proje: 'proje',
+  'proje takipçisi': 'proje', 'proje takipcisi': 'proje',
+}
 
 export function Users() {
-  const { users, customers, addUser, updateUser, role } = useApp()
+  const { users, customers, addUser, updateUser, bulkUpsertUsers, role } = useApp()
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<AppUser | null>(null)
   const [creating, setCreating] = useState(false)
@@ -18,6 +22,11 @@ export function Users() {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkText, setBulkText] = useState('')
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkError, setBulkError] = useState('')
+  const [bulkResults, setBulkResults] = useState<BulkUserResult[]>([])
   const filtered = useMemo(() => users.filter((user) => `${user.name} ${user.phone} ${user.email} ${roleLabels[user.role]}`.toLocaleLowerCase('tr-TR').includes(query.toLocaleLowerCase('tr-TR'))).sort((a, b) => a.name.localeCompare(b.name, 'tr-TR')), [query, users])
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
@@ -67,8 +76,56 @@ export function Users() {
     }
   }
 
+  const closeBulk = () => {
+    if (bulkBusy) return
+    setBulkOpen(false)
+    setBulkText('')
+    setBulkError('')
+    setBulkResults([])
+  }
+  const importBulkUsers = async () => {
+    setBulkError(''); setBulkResults([]); setMessage(''); setError('')
+    const rows = bulkText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+    if (rows.length === 0) {
+      setBulkError('En az bir kullanıcı satırı girin.')
+      return
+    }
+    if (rows.length > 50) {
+      setBulkError('Tek seferde en fazla 50 kullanıcı eklenebilir.')
+      return
+    }
+    const entries: BulkUserEntry[] = []
+    for (let index = 0; index < rows.length; index += 1) {
+      const [rawName = '', rawPhone = '', rawRole = '', ...passwordParts] = rows[index].split(';')
+      const name = rawName.trim()
+      const phone = rawPhone.trim()
+      const normalizedRole = rawRole.trim().toLocaleLowerCase('tr-TR')
+      const parsedRole = bulkRoleAliases[normalizedRole]
+      const password = passwordParts.join(';').trim()
+      if (!name || phone.replace(/\D/g, '').length < 10 || !parsedRole || password.length < 8) {
+        setBulkError(`${index + 1}. satır geçersiz. Ad, en az 10 rakamlı telefon, rol ve en az 8 karakterli şifre girin.`)
+        return
+      }
+      entries.push({ name, phone, role: parsedRole, password })
+    }
+    setBulkBusy(true)
+    try {
+      const results = await bulkUpsertUsers(entries)
+      setBulkResults(results)
+      const succeeded = results.filter((result) => result.ok).length
+      const failed = results.length - succeeded
+      setMessage(`${succeeded} kullanıcı oluşturuldu veya güncellendi${failed ? `; ${failed} satır tamamlanamadı` : ''}.`)
+      if (failed) setBulkError('Tamamlanamayan satırların açıklaması aşağıda gösteriliyor.')
+    } catch (reason) {
+      setBulkError(reason instanceof Error ? reason.message : 'Toplu kullanıcı işlemi tamamlanamadı.')
+    } finally {
+      setBulkText('')
+      setBulkBusy(false)
+    }
+  }
+
   return <div className="page-stack">
-    <section className="page-title-row"><div><span className="eyebrow">YETKİ YÖNETİMİ</span><h1>Kullanıcılar</h1><p>Yönetici, usta ve proje takipçisi hesaplarını oluşturun ve düzenleyin.</p></div><button className="primary-button" onClick={() => setCreating(true)}><Plus size={17} /> Yeni kullanıcı</button></section>
+    <section className="page-title-row"><div><span className="eyebrow">YETKİ YÖNETİMİ</span><h1>Kullanıcılar</h1><p>Yönetici, usta ve proje takipçisi hesaplarını oluşturun ve düzenleyin.</p></div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><button className="secondary-button" onClick={() => setBulkOpen(true)}><Upload size={17} /> Toplu kullanıcı ekle</button><button className="primary-button" onClick={() => setCreating(true)}><Plus size={17} /> Yeni kullanıcı</button></div></section>
     {message && <div className="page-message success">{message}</div>}{error && <div className="page-message error">{error}</div>}
     <section className="user-metric-grid">
       <div className="panel"><ShieldCheck /><span><strong>{users.filter((user) => user.role === 'admin').length}</strong> yönetici</span></div>
@@ -79,6 +136,16 @@ export function Users() {
     <section className="toolbar panel"><label className="list-search"><Search size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="İsim, telefon, e-posta veya rol ara…" /></label><div className="result-count"><strong>{filtered.length}</strong> kullanıcı</div></section>
     <section className="panel table-panel"><div className="data-table users-table"><div className="table-row table-head"><span>Kullanıcı</span><span>İletişim</span><span>Rol</span><span>Durum</span><span /></div>{filtered.map((user) => <div className="table-row" key={user.id}><span><i className="avatar">{initials(user.name)}</i>{role === 'admin' && (user.role === 'usta' || user.role === 'proje') ? <button className="entity-name-link" onClick={() => setProfile({ kind: 'user', id: user.id })}>{user.name}</button> : <strong>{user.name}</strong>}</span><span><span><strong>{user.phone}</strong><small>{user.email || 'Telefonla giriş'}</small></span></span><span><em className={`role-badge role-${user.role}`}>{roleLabels[user.role]}</em></span><span><em className={`status-pill ${user.active ? 'status-tamamlandı' : 'status-gecikti'}`}>{user.active ? 'Aktif' : 'Pasif'}</em></span><span><button className="table-action" onClick={() => setEditing(user)}><Edit3 size={14} /> Düzenle</button></span></div>)}</div></section>
     <UserModal open={creating || Boolean(editing)} user={editing} customers={customers} busy={busy} error={error} onClose={() => { setCreating(false); setEditing(null); setError('') }} onSave={save} />
+    <Modal open={bulkOpen} onClose={closeBulk} eyebrow="TOPLU KULLANICI" title="Kullanıcı listesini içe aktar">
+      <div className="modal-form">
+        <p className="form-help">Her personeli ayrı satıra <strong>Ad Soyad;Telefon;Rol;Şifre</strong> biçiminde yazın. Roller: Usta, Proje Takipçisi veya Yönetici. Müşteri hesapları bağlı cari seçimi gerektiği için tek tek oluşturulur.</p>
+        <label className="field"><span>Kullanıcı satırları</span><textarea value={bulkText} onChange={(event) => setBulkText(event.target.value)} disabled={bulkBusy} rows={9} autoComplete="off" spellCheck={false} placeholder={'Örnek Usta;05xxxxxxxxx;Usta;en-az-8-karakter'} style={{ width: '100%', resize: 'vertical', minHeight: 190, padding: 11, border: '1px solid #dfe1db', borderRadius: 8, font: 'inherit' }} /></label>
+        <p className="form-help">Şifreler yalnız güvenli sunucu isteğinde kullanılır; uygulama kayıtlarına yazılmaz ve işlemden sonra bu alan temizlenir.</p>
+        {bulkError && <div className="auth-message error">{bulkError}</div>}
+        {bulkResults.length > 0 && <div style={{ display: 'grid', gap: 6, marginTop: 12 }}>{bulkResults.map((result) => <div className={`page-message ${result.ok ? 'success' : 'error'}`} key={`${result.index}-${result.name}`}><strong>{result.name}</strong> · {result.ok ? 'Tamamlandı' : result.error ?? 'Tamamlanamadı'}</div>)}</div>}
+        <footer className="modal-footer"><button className="secondary-button" onClick={closeBulk} disabled={bulkBusy}>Kapat</button><button className="primary-button" onClick={() => { void importBulkUsers() }} disabled={bulkBusy || !bulkText.trim()}>{bulkBusy && <LoaderCircle className="spin" size={16} />} Kullanıcıları aktar</button></footer>
+      </div>
+    </Modal>
     <EntityDetailModal subject={profile} onClose={() => setProfile(null)} />
   </div>
 }

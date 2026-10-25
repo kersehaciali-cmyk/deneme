@@ -1,7 +1,8 @@
-import { CalendarClock, Camera, Check, ChevronDown, ChevronRight, FileCheck2, FileSpreadsheet, Image, MapPin, MessageSquare, Navigation, PackageCheck, Phone, Plus, Printer, RotateCcw, Save, Trash2, UserRound, Video } from 'lucide-react'
+import { AlertTriangle, CalendarClock, Camera, Check, ChevronDown, ChevronRight, FileCheck2, FileSpreadsheet, Image, LoaderCircle, MapPin, MessageSquare, Navigation, PackageCheck, Phone, Plus, Printer, RotateCcw, Save, Trash2, UserRound, Video } from 'lucide-react'
 import { useState, type ChangeEvent } from 'react'
 import { EntityDetailModal, type ProfileSubject } from '../components/EntityDetailModal'
 import { MediaPreview } from '../components/MediaPreview'
+import { Modal } from '../components/Modal'
 import { useApp } from '../context/AppContext'
 import { directionsUrl, isProjectClosed, projectProgress, sortProjectsNewestFirst } from '../lib/domain'
 import { buildApproximateMaterials } from '../lib/materials'
@@ -9,6 +10,10 @@ import { deleteMediaFile, saveMediaFile } from '../lib/mediaStore'
 import type { Project, ProjectMaterial, Role, Survey } from '../types'
 
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character] ?? character)
+const spreadsheetCell = (value: unknown) => {
+  const text = String(value ?? '').replace(/[\t\r\n]+/g, ' ').trim()
+  return /^[=+\-@]/.test(text) ? `'${text}` : text
+}
 const preparationDate = (applicationDate?: string) => {
   if (!applicationDate) return 'Belirlenmedi'
   const date = new Date(`${applicationDate}T12:00:00`)
@@ -17,7 +22,7 @@ const preparationDate = (applicationDate?: string) => {
 }
 
 export function Projects() {
-  const { projects, customers, users, surveys, products, templates, jobs, updateProject, updateJob, updateTemplate, role, currentUser } = useApp()
+  const { projects, customers, users, surveys, products, templates, jobs, updateProject, updateJob, updateTemplate, resetProjects, role, currentUser } = useApp()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [profile, setProfile] = useState<ProfileSubject | null>(null)
   const [filter, setFilter] = useState<'all' | 'open' | 'approval' | 'closed'>(() => {
@@ -29,9 +34,30 @@ export function Projects() {
     return 'all'
   })
   const [newMaterial, setNewMaterial] = useState({ label: '', quantity: 1, unit: 'adet' })
+  const [resetOpen, setResetOpen] = useState(false)
+  const [resetConfirmation, setResetConfirmation] = useState('')
+  const [resetBusy, setResetBusy] = useState(false)
+  const [resetMessage, setResetMessage] = useState('')
+  const [resetError, setResetError] = useState('')
   const roleProjects = role === 'musteri' ? projects.filter((project) => project.customerId === currentUser.customerId) : role === 'usta' ? projects.filter((project) => project.assignedMasterId === currentUser.id) : projects
   const isApprovalWaiting = (project: Project) => project.stages[project.currentStage]?.toLocaleLowerCase('tr-TR').includes('onaya gönderildi') ?? false
   const visible = sortProjectsNewestFirst(roleProjects.filter((project) => filter === 'all' || (filter === 'open' && !isProjectClosed(project)) || (filter === 'closed' && isProjectClosed(project)) || (filter === 'approval' && isApprovalWaiting(project))))
+
+  const runProjectReset = async () => {
+    if (resetConfirmation !== 'PROJELERİ SIFIRLA') return
+    setResetBusy(true); setResetError(''); setResetMessage('')
+    try {
+      const result = await resetProjects()
+      setResetMessage(`${result.deletedProjects ?? projects.length} proje ve ${result.deletedJobs ?? jobs.length} bağlı iş silindi. Keşifler ve müşteriler korunarak ilişki sayaçları sıfırlandı.`)
+      setExpandedId(null)
+      setResetOpen(false)
+      setResetConfirmation('')
+    } catch (reason) {
+      setResetError(reason instanceof Error ? reason.message : 'Projeler sıfırlanamadı.')
+    } finally {
+      setResetBusy(false)
+    }
+  }
 
   const replaceMaterials = (project: Project, materials: ProjectMaterial[]) => {
     updateProject({ ...project, materials })
@@ -68,7 +94,7 @@ export function Projects() {
   }
   const exportExcel = (project: Project) => {
     const rows = [['Sıra', 'Kontrol', 'Malzeme', 'Miktar', 'Birim', 'Not'], ...(project.materials ?? []).map((item, index) => [String(index + 1), item.prepared ? '☑' : '☐', item.label, String(item.quantity), item.unit, ''])]
-    const blob = new Blob([`\ufeff${rows.map((row) => row.join('\t')).join('\n')}`], { type: 'application/vnd.ms-excel;charset=utf-8' })
+    const blob = new Blob([`\ufeff${rows.map((row) => row.map(spreadsheetCell).join('\t')).join('\n')}`], { type: 'application/vnd.ms-excel;charset=utf-8' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
     link.download = `${project.id}-malzeme-listesi.xls`
@@ -86,7 +112,8 @@ export function Projects() {
   }
 
   return <div className="page-stack">
-    <section className="page-title-row"><div><span className="eyebrow">UÇTAN UCA UYGULAMA</span><h1>Proje ve iş takibi</h1><p>Uygulama, malzeme, saha kanıtları ve resmi kurum süreçlerini birlikte yönetin.</p></div><div className="segmented project-filters"><button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>Tümü</button><button className={filter === 'open' ? 'active' : ''} onClick={() => setFilter('open')}>Açık</button><button className={filter === 'approval' ? 'active' : ''} onClick={() => setFilter('approval')}>Onay bekleyen</button><button className={filter === 'closed' ? 'active' : ''} onClick={() => setFilter('closed')}>Biten</button></div></section>
+    <section className="page-title-row"><div><span className="eyebrow">UÇTAN UCA UYGULAMA</span><h1>Proje ve iş takibi</h1><p>Uygulama, malzeme, saha kanıtları ve resmi kurum süreçlerini birlikte yönetin.</p></div><div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}><div className="segmented project-filters"><button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>Tümü</button><button className={filter === 'open' ? 'active' : ''} onClick={() => setFilter('open')}>Açık</button><button className={filter === 'approval' ? 'active' : ''} onClick={() => setFilter('approval')}>Onay bekleyen</button><button className={filter === 'closed' ? 'active' : ''} onClick={() => setFilter('closed')}>Biten</button></div>{role === 'admin' && <button className="secondary-button" onClick={() => { setResetOpen(true); setResetError('') }}><Trash2 size={15} /> Projeleri sıfırla</button>}</div></section>
+    {resetMessage && <div className="page-message success">{resetMessage}</div>}
     <section className="project-list">{visible.map((project) => {
       const customer = customers.find((item) => item.id === project.customerId)
       const survey = surveys.find((item) => item.id === project.surveyId)
@@ -114,6 +141,14 @@ export function Projects() {
         </div>}
       </article>
     })}{visible.length === 0 && <div className="empty-list panel">Bu listede gösterilecek proje bulunmuyor.</div>}</section>
+    <Modal open={resetOpen} onClose={() => { if (!resetBusy) { setResetOpen(false); setResetConfirmation(''); setResetError('') } }} eyebrow="YÖNETİCİ İŞLEMİ" title="Projeler ve bağlı işleri sıfırla">
+      <div className="modal-form">
+        <div className="auth-message error"><AlertTriangle size={17} /> Bu işlem {projects.length} proje ile bunlara bağlı işleri kalıcı olarak siler. Müşteri, keşif, ürün, şablon ve ödeme kayıtları korunur. Projeye dönüştürülmüş keşifler yeniden “Kabul Edildi” durumuna alınır.</div>
+        <label className="field"><span>Onaylamak için PROJELERİ SIFIRLA yazın</span><input value={resetConfirmation} onChange={(event) => setResetConfirmation(event.target.value)} disabled={resetBusy} autoComplete="off" /></label>
+        {resetError && <div className="auth-message error">{resetError}</div>}
+        <footer className="modal-footer"><button className="secondary-button" onClick={() => { setResetOpen(false); setResetConfirmation(''); setResetError('') }} disabled={resetBusy}>Vazgeç</button><button className="primary-button" onClick={() => { void runProjectReset() }} disabled={resetBusy || resetConfirmation !== 'PROJELERİ SIFIRLA'}>{resetBusy && <LoaderCircle className="spin" size={16} />} Kalıcı olarak sıfırla</button></footer>
+      </div>
+    </Modal>
     <EntityDetailModal subject={profile} onClose={() => setProfile(null)} />
   </div>
 }

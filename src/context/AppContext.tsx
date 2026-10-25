@@ -8,6 +8,28 @@ import { useAuth } from './AuthContext'
 type SyncStatus = 'loading' | 'online' | 'error'
 type EntityType = 'customer' | 'survey' | 'template' | 'product' | 'job' | 'project' | 'payment'
 
+export interface BulkUserEntry {
+  name: string
+  phone: string
+  role: Role
+  password: string
+}
+
+export interface BulkUserResult {
+  index: number
+  name: string
+  ok: boolean
+  status?: 'created' | 'updated' | 'error'
+  error?: string
+}
+
+export interface ProjectResetResult {
+  deletedProjects?: number
+  deletedJobs?: number
+  resetSurveys?: number
+  resetCustomers?: number
+}
+
 interface AppState {
   role: Role
   currentUser: AppUser
@@ -15,6 +37,8 @@ interface AppState {
   users: AppUser[]
   addUser: (user: Omit<AppUser, 'id'>, password?: string) => Promise<void>
   updateUser: (user: AppUser, password?: string) => Promise<void>
+  bulkUpsertUsers: (entries: BulkUserEntry[]) => Promise<BulkUserResult[]>
+  resetProjects: () => Promise<ProjectResetResult>
   customers: Customer[]
   addCustomer: (customer: Omit<Customer, 'id' | 'createdAt' | 'openProjectCount' | 'balance'>) => Customer
   surveys: Survey[]
@@ -24,7 +48,7 @@ interface AppState {
   addTemplate: (template: Omit<SurveyTemplate, 'id'>) => void
   updateTemplate: (template: SurveyTemplate) => void
   products: Product[]
-  updateProduct: (product: Product) => void
+  updateProduct: (product: Product) => Promise<void>
   jobs: Job[]
   updateJob: (job: Job) => void
   projects: Project[]
@@ -145,6 +169,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     void supabase.from('app_records').upsert({ organization_id: organizationId, entity_type: entityType, entity_id: entity.id, data: entity }).then(({ error }) => setSyncStatus(error ? 'error' : 'online'))
   }, [organizationId])
 
+  const saveRecordAndWait = useCallback(async (entityType: EntityType, entity: { id: string }) => {
+    if (!supabase || !organizationId) throw new Error('Bulut bağlantısı bulunamadı.')
+    setSyncStatus('loading')
+    const { error } = await supabase.from('app_records').upsert({ organization_id: organizationId, entity_type: entityType, entity_id: entity.id, data: entity })
+    setSyncStatus(error ? 'error' : 'online')
+    if (error) throw error
+  }, [organizationId])
+
   const value = useMemo<AppState>(() => ({
     role: profile?.role ?? 'musteri',
     currentUser: profile!,
@@ -161,6 +193,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.functions.invoke('admin-users', { body: { action: 'update', user, password: password || undefined } })
       if (error) throw new Error(await functionErrorMessage(error))
       await loadCloudData()
+    },
+    bulkUpsertUsers: async (entries) => {
+      if (!supabase) throw new Error('Bulut bağlantısı bulunamadı.')
+      const { data, error } = await supabase.functions.invoke('admin-users', { body: { action: 'bulkUpsert', users: entries } })
+      if (error) throw new Error(await functionErrorMessage(error))
+      await loadCloudData()
+      const results = (data as { results?: Array<Omit<BulkUserResult, 'ok'> & { status?: 'created' | 'updated' | 'error' }> } | null)?.results ?? []
+      return results.map((result) => ({ ...result, ok: result.status !== 'error' }))
+    },
+    resetProjects: async () => {
+      if (!supabase) throw new Error('Bulut bağlantısı bulunamadı.')
+      const { data, error } = await supabase.functions.invoke('admin-users', { body: { action: 'resetProjects', confirmation: 'PROJELERİ SIFIRLA' } })
+      if (error) throw new Error(await functionErrorMessage(error))
+      await loadCloudData()
+      const result = data as { deleted?: { projects?: number; jobs?: number }; reset?: { surveys?: number; customers?: number } } | null
+      return {
+        deletedProjects: result?.deleted?.projects,
+        deletedJobs: result?.deleted?.jobs,
+        resetSurveys: result?.reset?.surveys,
+        resetCustomers: result?.reset?.customers,
+      }
     },
     customers,
     addCustomer: (input) => {
@@ -180,13 +233,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
     updateTemplate: (template) => { setTemplates((current) => current.map((item) => item.id === template.id ? template : item)); saveRecord('template', template) },
     products,
-    updateProduct: (product) => {
+    updateProduct: async (product) => {
       const previous = products.find((item) => item.id === product.id)
       const next = previous && (previous.cost !== product.cost || previous.sale !== product.sale)
         ? { ...product, priceHistory: [...(previous.priceHistory ?? []), { id: `${product.id}-${Date.now()}`, date: new Date().toISOString().slice(0, 10), cost: product.cost, sale: product.sale }] }
         : product
       setProducts((current) => current.map((item) => item.id === next.id ? next : item))
-      saveRecord('product', next)
+      try {
+        await saveRecordAndWait('product', next)
+      } catch (error) {
+        if (previous) setProducts((current) => current.map((item) => item.id === previous.id ? previous : item))
+        throw error
+      }
     },
     jobs,
     updateJob: (job) => { setJobs((current) => current.map((item) => item.id === job.id ? job : item)); saveRecord('job', job) },
@@ -201,7 +259,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const due = new Date(`${applicationDate}T12:00:00`)
       due.setDate(due.getDate() + 30)
       const template = templates.find((item) => item.id === survey.templateId)
-      const materials = buildApproximateMaterials(survey, template, products)
+      const materials = (survey.materials ?? buildApproximateMaterials(survey, template, products)).map((material) => ({ ...material }))
       const project: Project = { id: `PRJ-${Date.now()}`, customerId: survey.customerId, surveyId, type: survey.type, createdAt: new Date().toISOString(), currentStage: 0, stages, owner: manager?.name ?? 'Proje Takipçisi', ownerId: manager?.id, dueDate: due.toISOString().slice(0, 10), assignedMasterId: masterId, applicationDate, materialTemplateId: template?.id, siteAddress: survey.siteAddress, siteContactName: survey.siteContactName, siteContactPhone: survey.siteContactPhone, latitude: survey.latitude, longitude: survey.longitude, materials, attachments: [], adminApproved: false }
       const nextSurvey = { ...survey, status: 'Projeye Dönüştü' as const }
       const customer = customers.find((item) => item.id === survey.customerId)
@@ -215,7 +273,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
     payments,
     updatePayment: (payment) => { setPayments((current) => current.map((item) => item.id === payment.id ? payment : item)); saveRecord('payment', payment) },
-  }), [customers, jobs, loadCloudData, payments, products, profile, projects, saveRecord, surveys, syncStatus, templates, users])
+  }), [customers, jobs, loadCloudData, payments, products, profile, projects, saveRecord, saveRecordAndWait, surveys, syncStatus, templates, users])
 
   if (syncStatus === 'loading' && products.length === 0) return <div className="cloud-loading"><span /><strong>Şirket verileri eşitleniyor…</strong></div>
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
