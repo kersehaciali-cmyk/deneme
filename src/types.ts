@@ -60,6 +60,22 @@ export interface Survey {
   longitude?: number
   attachments?: SurveyAttachment[]
   materials?: ProjectMaterial[]
+  auditLog?: SurveyAuditEntry[]
+}
+
+export interface SurveyAuditChange {
+  field: string
+  before: string
+  after: string
+  kind?: 'field' | 'selection' | 'price'
+}
+
+export interface SurveyAuditEntry {
+  id: string
+  createdAt: string
+  actorId: string
+  actorName: string
+  changes: SurveyAuditChange[]
 }
 
 export interface SurveyAttachment {

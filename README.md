@@ -25,6 +25,9 @@ Uygulama Supabase üzerinde çalışır:
 - Keşif kopyalama, düzenlenebilir oda/radyatör seçimleri ve mobil uyumlu hızlı keşif
 - Fiyat kataloğunu Excel uyumlu dosyayla toplu indirme ve güncelleme
 - Yönetici için toplu personel oluşturma ve güvenli proje sıfırlama araçları
+- Yönetici genel bakışında filtrelenebilir keşif, devam eden proje ve tamamlanan iş listeleri
+- Keşif düzenleme ve kullanıcı/tarih/eski-yeni değer içeren değişiklik geçmişi
+- Usta ve proje takipçisi için sunucu tarafında maskelenen finansal alanlar
 
 Şifreler uygulama kayıtlarında tutulmaz. Kimlik doğrulama servisi tarafından güvenli biçimde yönetilir. Supabase `service_role` anahtarı hiçbir zaman masaüstü, web veya mobil uygulamanın `.env` dosyasına yazılmamalıdır.
 

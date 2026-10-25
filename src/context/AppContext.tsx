@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { acStages, gasStages, heatPumpStages, plumbingStages, seedCustomers, seedJobs, seedPayments, seedProducts, seedProjects, seedSurveys, seedTemplates } from '../data'
+import { acStages, gasStages, heatPumpStages, plumbingStages, seedCustomers, seedJobs, seedPayments, seedProducts, seedProjects, seedSurveys, seedTemplates, workItemDefinitions } from '../data'
 import { supabase } from '../lib/supabase'
 import { buildApproximateMaterials } from '../lib/materials'
+import { createSurveyAuditEntry } from '../lib/surveyAudit'
 import type { AppUser, Customer, Job, Payment, Product, Project, Role, Survey, SurveyTemplate } from '../types'
 import { useAuth } from './AuthContext'
 
@@ -44,6 +45,7 @@ interface AppState {
   surveys: Survey[]
   addSurvey: (survey: Survey) => void
   updateSurvey: (survey: Survey) => void
+  updateSurveyWithAudit: (survey: Survey) => Promise<void>
   templates: SurveyTemplate[]
   addTemplate: (template: Omit<SurveyTemplate, 'id'>) => void
   updateTemplate: (template: SurveyTemplate) => void
@@ -115,6 +117,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [jobs, setJobs] = useState<Job[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
+  const isFieldRole = profile?.role === 'usta' || profile?.role === 'proje'
 
   const applyRecords = useCallback((records: CloudRecord[]) => {
     const ofType = <T,>(type: EntityType) => records.filter((record) => record.entity_type === type).map((record) => record.data as T)
@@ -131,10 +134,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!supabase || !organizationId) return
     setSyncStatus('loading')
     try {
-      const recordsQuery = supabase.from('app_records').select('entity_type,entity_id,data').eq('organization_id', organizationId)
-      const visibleRecordsQuery = profile?.role === 'usta' || profile?.role === 'proje'
-        ? recordsQuery.neq('entity_type', 'payment')
-        : recordsQuery
+      const visibleRecordsQuery = isFieldRole
+        ? supabase.rpc('get_visible_app_records')
+        : supabase.from('app_records').select('entity_type,entity_id,data').eq('organization_id', organizationId)
       const [recordsResult, profilesResult] = await Promise.all([
         visibleRecordsQuery,
         supabase.from('profiles').select('id,name,phone,email,role,active,organization_id,customer_id').eq('organization_id', organizationId).order('name'),
@@ -154,32 +156,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch {
       setSyncStatus('error')
     }
-  }, [applyRecords, organizationId, profile?.role])
+  }, [applyRecords, isFieldRole, organizationId, profile?.role])
 
   useEffect(() => {
     void loadCloudData()
     if (!supabase || !organizationId) return
     const client = supabase
+    const recordsEventTable = isFieldRole ? 'app_record_events' : 'app_records'
     const channel = client.channel(`organization-${organizationId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_records', filter: `organization_id=eq.${organizationId}` }, () => { void loadCloudData() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: recordsEventTable, filter: `organization_id=eq.${organizationId}` }, () => { void loadCloudData() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `organization_id=eq.${organizationId}` }, () => { void loadCloudData() })
       .subscribe()
     return () => { void client.removeChannel(channel) }
-  }, [loadCloudData, organizationId])
+  }, [isFieldRole, loadCloudData, organizationId])
 
   const saveRecord = useCallback((entityType: EntityType, entity: { id: string }) => {
     if (!supabase || !organizationId) return
     setSyncStatus('loading')
-    void supabase.from('app_records').upsert({ organization_id: organizationId, entity_type: entityType, entity_id: entity.id, data: entity }).then(({ error }) => setSyncStatus(error ? 'error' : 'online'))
-  }, [organizationId])
+    const request = isFieldRole
+      ? supabase.rpc('save_field_app_record', { p_entity_type: entityType, p_entity_id: entity.id, p_data: entity })
+      : supabase.from('app_records').upsert({ organization_id: organizationId, entity_type: entityType, entity_id: entity.id, data: entity })
+    void request.then(({ error }) => setSyncStatus(error ? 'error' : 'online'))
+  }, [isFieldRole, organizationId])
 
   const saveRecordAndWait = useCallback(async (entityType: EntityType, entity: { id: string }) => {
     if (!supabase || !organizationId) throw new Error('Bulut bağlantısı bulunamadı.')
     setSyncStatus('loading')
-    const { error } = await supabase.from('app_records').upsert({ organization_id: organizationId, entity_type: entityType, entity_id: entity.id, data: entity })
+    const { error } = isFieldRole
+      ? await supabase.rpc('save_field_app_record', { p_entity_type: entityType, p_entity_id: entity.id, p_data: entity })
+      : await supabase.from('app_records').upsert({ organization_id: organizationId, entity_type: entityType, entity_id: entity.id, data: entity })
     setSyncStatus(error ? 'error' : 'online')
     if (error) throw error
-  }, [organizationId])
+  }, [isFieldRole, organizationId])
 
   const value = useMemo<AppState>(() => ({
     role: profile?.role ?? 'musteri',
@@ -229,6 +237,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     surveys,
     addSurvey: (survey) => { setSurveys((current) => [survey, ...current]); saveRecord('survey', survey) },
     updateSurvey: (survey) => { setSurveys((current) => current.map((item) => item.id === survey.id ? survey : item)); saveRecord('survey', survey) },
+    updateSurveyWithAudit: async (survey) => {
+      const previous = surveys.find((item) => item.id === survey.id)
+      if (!previous) return
+      const entry = createSurveyAuditEntry(previous, survey, {
+        actorId: profile?.id ?? '',
+        actorName: profile?.name ?? 'Bilinmeyen kullanıcı',
+        products,
+        customerLabel: (id) => customers.find((item) => item.id === id)?.name ?? id,
+        templateLabel: (id) => templates.find((item) => item.id === id)?.name ?? id ?? '—',
+        workItemLabel: (key) => workItemDefinitions.find((item) => item.key === key)?.label ?? key,
+      })
+      if (!entry) return
+      const next = { ...survey, auditLog: [...(previous.auditLog ?? []), entry] }
+      setSurveys((current) => current.map((item) => item.id === next.id ? next : item))
+      try {
+        await saveRecordAndWait('survey', next)
+      } catch (error) {
+        setSurveys((current) => current.map((item) => item.id === previous.id ? previous : item))
+        throw error
+      }
+    },
     templates,
     addTemplate: (input) => {
       const template = { ...input, id: `tpl-${Date.now()}`, createdAt: new Date().toISOString() }
@@ -265,7 +294,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const template = templates.find((item) => item.id === survey.templateId)
       const materials = (survey.materials ?? buildApproximateMaterials(survey, template, products)).map((material) => ({ ...material }))
       const project: Project = { id: `PRJ-${Date.now()}`, customerId: survey.customerId, surveyId, type: survey.type, createdAt: new Date().toISOString(), currentStage: 0, stages, owner: manager?.name ?? 'Proje Takipçisi', ownerId: manager?.id, dueDate: due.toISOString().slice(0, 10), assignedMasterId: masterId, applicationDate, materialTemplateId: template?.id, siteAddress: survey.siteAddress, siteContactName: survey.siteContactName, siteContactPhone: survey.siteContactPhone, latitude: survey.latitude, longitude: survey.longitude, materials, attachments: [], adminApproved: false }
-      const nextSurvey = { ...survey, status: 'Projeye Dönüştü' as const }
+      const convertedSurvey = { ...survey, status: 'Projeye Dönüştü' as const }
+      const conversionAudit = createSurveyAuditEntry(survey, convertedSurvey, {
+        actorId: profile?.id ?? '',
+        actorName: profile?.name ?? 'Bilinmeyen kullanıcı',
+        products,
+        customerLabel: (id) => customers.find((item) => item.id === id)?.name ?? id,
+        templateLabel: (id) => templates.find((item) => item.id === id)?.name ?? id ?? '—',
+        workItemLabel: (key) => workItemDefinitions.find((item) => item.key === key)?.label ?? key,
+      })
+      const nextSurvey = conversionAudit ? { ...convertedSurvey, auditLog: [...(survey.auditLog ?? []), conversionAudit] } : convertedSurvey
       const customer = customers.find((item) => item.id === survey.customerId)
       const nextCustomer = customer ? { ...customer, openProjectCount: customer.openProjectCount + 1 } : undefined
       const job: Job = { id: `IS-${Date.now()}`, customerId: survey.customerId, projectId: project.id, createdAt: new Date().toISOString(), assignedMasterId: masterId, title: `${survey.type} uygulaması`, assignee: master?.name ?? 'Atanmadı', appointment: applicationDate, status: 'Planlandı', siteAddress: survey.siteAddress, siteContactName: survey.siteContactName, siteContactPhone: survey.siteContactPhone, latitude: survey.latitude, longitude: survey.longitude, checklist: materials.map((material) => ({ id: `check-${material.id}`, label: `${material.label} · ${material.quantity} ${material.unit}`, done: false })) }

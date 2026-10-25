@@ -59,11 +59,12 @@ PowerShell'de proje klasöründeyken aşağıdaki komutları çalıştırın. `P
 ```powershell
 npx.cmd supabase@latest login
 npx.cmd supabase@latest link --project-ref PROJE_KODUNUZ
+npx.cmd supabase@latest db push
 npx.cmd supabase@latest secrets set PUBLIC_APP_URL=https://uygulama.sirketiniz.com
 npx.cmd supabase@latest functions deploy admin-users
 ```
 
-Bu servis yalnızca yönetici oturumuyla çağrılabilir. Gizli `service_role` anahtarı Supabase'in sunucusunda kalır.
+`db push` komutu rol güvenliği dahil repodaki tüm yeni veritabanı güncellemelerini uygular. Yönetici kullanıcı servisi yalnızca yönetici oturumuyla çağrılabilir. Gizli `service_role` anahtarı Supabase'in sunucusunda kalır.
 
 ## 5. Tarayıcıda test edin
 
@@ -134,6 +135,8 @@ Yeni sürümü aldıktan sonra:
 ```powershell
 git pull
 npm.cmd install
+npx.cmd supabase@latest link --project-ref PROJE_KODUNUZ
+npx.cmd supabase@latest db push
 npm.cmd run build
 npm.cmd run mobile:sync
 ```

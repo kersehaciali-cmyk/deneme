@@ -1,9 +1,10 @@
-import { ArrowLeft, ArrowRight, Camera, Check, ClipboardPenLine, Copy, Flame, Image, LocateFixed, MapPin, Plus, Search, ShowerHead, Snowflake, ThermometerSun, Trash2, UserRoundPlus, Wind } from 'lucide-react'
-import { useMemo, useState, type ChangeEvent } from 'react'
+import { ArrowLeft, ArrowRight, Camera, Check, ClipboardPenLine, Copy, Edit3, Flame, Image, LocateFixed, MapPin, Plus, Search, ShowerHead, Snowflake, ThermometerSun, Trash2, UserRoundPlus, Wind } from 'lucide-react'
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import { Modal } from '../components/Modal'
 import { EntityDetailModal, type ProfileSubject } from '../components/EntityDetailModal'
 import { MediaPreview } from '../components/MediaPreview'
 import { SurveyDetailModal } from '../components/SurveyDetailModal'
+import { SurveyEditModal } from '../components/SurveyEditModal'
 import { workItemDefinitions } from '../data'
 import { useApp } from '../context/AppContext'
 import { calculateSurveyTotals, canViewPrices, formatCurrency, sortNewestFirst } from '../lib/domain'
@@ -20,6 +21,7 @@ const typeOptions: { value: SurveyType; description: string; icon: typeof Flame;
 ]
 
 const statusOptions: SurveyStatus[] = ['Taslak', 'Fiyatlandırıldı', 'Teklif Gönderildi', 'Kabul Edildi', 'Onaylandı', 'Siparişe Alındı', 'Projeye Dönüştü', 'Reddedildi']
+const manualStatusOptions = statusOptions.filter((status) => status !== 'Projeye Dönüştü')
 const projectReadyStatuses: SurveyStatus[] = ['Kabul Edildi', 'Onaylandı', 'Siparişe Alındı']
 const defaultRoomNames = ['Mutfak', 'Oturma Odası', 'Misafir Odası', 'Yatak Odası', 'Hol', 'Çocuk Odası']
 const createDefaultRooms = (): Room[] => defaultRoomNames.map((name, index) => ({ id: `room-${index + 1}`, name }))
@@ -55,13 +57,15 @@ function workItemForProduct(product: Product, type: SurveyType) {
 }
 
 export function Surveys() {
-  const { surveys, customers, role, updateSurvey, projects, users, convertSurveyToProject } = useApp()
+  const { surveys, customers, role, updateSurveyWithAudit, projects, users, convertSurveyToProject } = useApp()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [conversion, setConversion] = useState<Survey | null>(null)
   const [profile, setProfile] = useState<ProfileSubject | null>(null)
   const [detailSurveyId, setDetailSurveyId] = useState<string | null>(null)
   const [mediaSurveyId, setMediaSurveyId] = useState<string | null>(null)
+  const [editSurveyId, setEditSurveyId] = useState<string | null>(null)
+  const [statusError, setStatusError] = useState('')
   const [masterId, setMasterId] = useState(() => users.find((user) => user.role === 'usta' && user.active)?.id ?? '')
   const [applicationDate, setApplicationDate] = useState(new Date().toISOString().slice(0, 10))
   const hidePrices = !canViewPrices(role)
@@ -76,10 +80,19 @@ export function Surveys() {
     convertSurveyToProject(conversion.id, masterId, applicationDate)
     setConversion(null)
   }
+  const changeStatus = async (survey: Survey, status: SurveyStatus) => {
+    setStatusError('')
+    try {
+      await updateSurveyWithAudit({ ...survey, status })
+    } catch {
+      setStatusError(`${survey.id} durum değişikliği kaydedilemedi. İnternet bağlantısını kontrol edip yeniden deneyin.`)
+    }
+  }
 
   return <div className="page-stack">
     <section className="page-title-row"><div><span className="eyebrow">TEKLİF VE KEŞİF YÖNETİMİ</span><h1>Keşifler</h1><p>Keşiften teklife, teklif onayından projeye kadar tüm süreci yönetin.</p></div><button className="primary-button" onClick={() => setOpen(true)}><ClipboardPenLine size={18} /> Yeni keşif</button></section>
     <section className="toolbar panel"><label className="list-search"><Search size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Keşif, müşteri, tür veya durum ara…" /></label><div className="result-count"><strong>{filtered.length}</strong> keşif</div></section>
+    {statusError && <div className="page-message error" role="alert">{statusError}</div>}
     <section className="panel table-panel">
       <div className={`data-table survey-workflow-table ${hidePrices ? 'without-price' : ''}`}>
         <div className="table-row table-head"><span>Keşif</span><span>Müşteri</span><span>Tür / şablon</span>{!hidePrices && <span>Teklif</span>}<span>Durum</span><span>İşlem</span></div>
@@ -92,8 +105,8 @@ export function Surveys() {
             <span><span>{role === 'admin' && customer ? <button className="entity-name-link" onClick={() => setProfile({ kind: 'customer', id: customer.id })}>{customer.name}</button> : <strong>{customer?.name}</strong>}<small>{survey.siteAddress ?? customer?.district}</small></span></span>
             <span><i className={`type-dot type-${survey.type === 'Doğalgaz' ? 'gas' : survey.type === 'Sıhhi Tesisat' ? 'water' : survey.type === 'Klima' ? 'ac' : 'heat'}`} /><span><strong>{survey.type}</strong><small>{survey.workItemKeys?.length ?? 0} iş kalemi</small></span></span>
             {!hidePrices && <span><strong>{formatCurrency(survey.total)}</strong></span>}
-            <span>{canManage ? <select className="status-select" value={survey.status} onChange={(event) => updateSurvey({ ...survey, status: event.target.value as SurveyStatus })}>{statusOptions.map((status) => <option value={status} key={status}>{status}</option>)}</select> : <em className={`status-pill status-${survey.status.toLocaleLowerCase('tr-TR').replaceAll(' ', '-')}`}>{survey.status}</em>}</span>
-            <span><div className="survey-row-actions"><button className="table-action detail-action" onClick={() => setDetailSurveyId(survey.id)}><ClipboardPenLine size={14} /> Detay</button><button className="table-action media-action" onClick={() => setMediaSurveyId(survey.id)}><Camera size={14} /> Fotoğraflar ({survey.attachments?.length ?? 0})</button>{alreadyProject || survey.status === 'Projeye Dönüştü' ? <button className="table-action success" disabled><Check size={14} /> Proje oluştu</button> : canManage && projectReadyStatuses.includes(survey.status) ? <button className="table-action" onClick={() => setConversion(survey)}>Projeye dönüştür <ArrowRight size={14} /></button> : <small>Teklif süreci devam ediyor</small>}</div></span>
+            <span>{canManage && !alreadyProject && survey.status !== 'Projeye Dönüştü' ? <select className="status-select" value={survey.status} onChange={(event) => { void changeStatus(survey, event.target.value as SurveyStatus) }}>{manualStatusOptions.map((status) => <option value={status} key={status}>{status}</option>)}</select> : <em className={`status-pill status-${survey.status.toLocaleLowerCase('tr-TR').replaceAll(' ', '-')}`}>{survey.status}</em>}</span>
+            <span><div className="survey-row-actions"><button className="table-action detail-action" onClick={() => setDetailSurveyId(survey.id)}><ClipboardPenLine size={14} /> Detay</button>{role === 'admin' && <button className="table-action" onClick={() => setEditSurveyId(survey.id)}><Edit3 size={14} /> Düzenle</button>}<button className="table-action media-action" onClick={() => setMediaSurveyId(survey.id)}><Camera size={14} /> Fotoğraflar ({survey.attachments?.length ?? 0})</button>{alreadyProject || survey.status === 'Projeye Dönüştü' ? <button className="table-action success" disabled><Check size={14} /> Proje oluştu</button> : canManage && projectReadyStatuses.includes(survey.status) ? <button className="table-action" onClick={() => setConversion(survey)}>Projeye dönüştür <ArrowRight size={14} /></button> : <small>Teklif süreci devam ediyor</small>}</div></span>
           </div>
         })}
       </div>
@@ -103,6 +116,7 @@ export function Surveys() {
       {conversion && <div className="modal-form"><div className="conversion-summary"><strong>{conversion.id} · {customers.find((customer) => customer.id === conversion.customerId)?.name}</strong><span>{conversion.type} keşfi için iş ve malzeme listesi otomatik oluşturulacak.</span></div><div className="form-grid two"><label><span>Atanacak usta</span><select value={masterId} onChange={(event) => setMasterId(event.target.value)}>{users.filter((user) => user.role === 'usta' && user.active).map((user) => <option value={user.id} key={user.id}>{user.name}</option>)}</select></label><label><span>Uygulama günü</span><input type="date" value={applicationDate} onChange={(event) => setApplicationDate(event.target.value)} /></label></div><p className="form-help">Aynı güne birden fazla iş atanabilir; gün içi sıralaması saha ekibi tarafından yapılır.</p><footer className="modal-footer"><button className="secondary-button" onClick={() => setConversion(null)}>Vazgeç</button><button className="primary-button" disabled={!masterId || !applicationDate} onClick={convert}>Projeyi oluştur</button></footer></div>}
     </Modal>
     <SurveyDetailModal surveyId={detailSurveyId} onClose={() => setDetailSurveyId(null)} />
+    {editSurveyId && <SurveyEditModal surveyId={editSurveyId} onClose={() => setEditSurveyId(null)} />}
     <SurveyMediaModal surveyId={mediaSurveyId} onClose={() => setMediaSurveyId(null)} />
     <EntityDetailModal subject={profile} onClose={() => setProfile(null)} />
   </div>
@@ -335,17 +349,46 @@ function SurveyWizard({ open, onClose }: { open: boolean; onClose: () => void })
 }
 
 function SurveyMediaModal({ surveyId, onClose }: { surveyId: string | null; onClose: () => void }) {
-  const { surveys, updateSurvey, role } = useApp()
+  const { surveys, updateSurveyWithAudit, role } = useApp()
+  const [draftAttachments, setDraftAttachments] = useState<SurveyAttachment[] | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const survey = surveys.find((item) => item.id === surveyId)
+  useEffect(() => {
+    setDraftAttachments(null)
+    setError('')
+  }, [surveyId])
   if (!survey) return null
-  const attachments = survey.attachments ?? []
-  const updateAttachments = (next: SurveyAttachment[]) => updateSurvey({ ...survey, attachments: next })
+  const savedAttachments = survey.attachments ?? []
+  const attachments = draftAttachments ?? savedAttachments
+  const dirty = draftAttachments !== null && JSON.stringify(draftAttachments) !== JSON.stringify(savedAttachments)
+  const updateAttachments = (next: SurveyAttachment[]) => { setDraftAttachments(next); setError('') }
   const upload = (event: ChangeEvent<HTMLInputElement>) => {
     updateAttachments([...attachments, ...createSurveyAttachments([...event.target.files ?? []], role)])
     event.target.value = ''
   }
-  return <Modal open onClose={onClose} eyebrow="KEŞİF MEDYALARI" title={`${survey.id} · Fotoğraflar`} wide>
-    <div className="survey-media-modal"><SurveyPhotoEditor attachments={attachments} onUpload={upload} onDescription={(id, description) => updateAttachments(attachments.map((photo) => photo.id === id ? { ...photo, description } : photo))} onRemove={(id) => { void deleteMediaFile(id).catch(() => undefined); updateAttachments(attachments.filter((photo) => photo.id !== id)) }} /></div>
+  const close = () => {
+    if (saving) return
+    const addedIds = attachments.filter((photo) => !savedAttachments.some((saved) => saved.id === photo.id)).map((photo) => photo.id)
+    addedIds.forEach((id) => { void deleteMediaFile(id).catch(() => undefined) })
+    onClose()
+  }
+  const save = async () => {
+    if (!dirty) { onClose(); return }
+    setSaving(true)
+    setError('')
+    try {
+      await updateSurveyWithAudit({ ...survey, attachments })
+      const removedIds = savedAttachments.filter((photo) => !attachments.some((current) => current.id === photo.id)).map((photo) => photo.id)
+      await Promise.all(removedIds.map((id) => deleteMediaFile(id).catch(() => undefined)))
+      onClose()
+    } catch {
+      setError('Fotoğraf değişiklikleri buluta kaydedilemedi. İnternet bağlantısını kontrol edip yeniden deneyin.')
+      setSaving(false)
+    }
+  }
+  return <Modal open onClose={close} eyebrow="KEŞİF MEDYALARI" title={`${survey.id} · Fotoğraflar`} wide>
+    <div className="survey-media-modal"><SurveyPhotoEditor attachments={attachments} onUpload={upload} onDescription={(id, description) => updateAttachments(attachments.map((photo) => photo.id === id ? { ...photo, description } : photo))} onRemove={(id) => updateAttachments(attachments.filter((photo) => photo.id !== id))} />{error && <div className="auth-message error">{error}</div>}<footer className="modal-footer"><button className="secondary-button" onClick={close} disabled={saving}>Vazgeç</button><button className="primary-button" onClick={() => { void save() }} disabled={saving || !dirty}><Check size={15} /> {saving ? 'Kaydediliyor…' : 'Fotoğrafları kaydet'}</button></footer></div>
   </Modal>
 }
 

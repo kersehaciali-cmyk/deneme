@@ -1,5 +1,5 @@
-import { Camera, Check, ClipboardList, FileSpreadsheet, MapPin, Package, Phone, Plus, Printer, RotateCcw, ThermometerSun, Trash2, UserRound } from 'lucide-react'
-import { useState } from 'react'
+import { Camera, Check, ClipboardList, FileSpreadsheet, History, MapPin, Package, Phone, Plus, Printer, RotateCcw, Save, ThermometerSun, Trash2, UserRound } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { workItemDefinitions } from '../data'
 import { useApp } from '../context/AppContext'
 import { canViewPrices, formatCurrency } from '../lib/domain'
@@ -15,9 +15,17 @@ const spreadsheetCell = (value: unknown) => {
 }
 
 export function SurveyDetailModal({ surveyId, onClose }: { surveyId: string | null; onClose: () => void }) {
-  const { surveys, customers, products, templates, role, updateSurvey } = useApp()
+  const { surveys, customers, products, templates, role, updateSurveyWithAudit } = useApp()
   const [newMaterial, setNewMaterial] = useState({ label: '', quantity: 1, unit: 'adet' })
+  const [materialDrafts, setMaterialDrafts] = useState<ProjectMaterial[] | null>(null)
+  const [materialSaving, setMaterialSaving] = useState(false)
+  const [materialError, setMaterialError] = useState('')
   const survey = surveys.find((item) => item.id === surveyId)
+  useEffect(() => {
+    setMaterialDrafts(null)
+    setMaterialError('')
+    setNewMaterial({ label: '', quantity: 1, unit: 'adet' })
+  }, [surveyId])
   if (!survey) return null
 
   const customer = customers.find((item) => item.id === survey.customerId)
@@ -29,19 +37,35 @@ export function SurveyDetailModal({ surveyId, onClose }: { surveyId: string | nu
   }, 0)
   const hasSnapshotPrices = survey.lines.some((line) => line.unitSale !== undefined)
   const attachments = survey.attachments ?? []
+  const auditLog = [...(survey.auditLog ?? [])].reverse()
   const selectedRooms = survey.rooms.filter((room) => {
     const radiatorLine = survey.lines.find((line) => line.roomId === room.id && line.productId === room.radiatorProductId)
     return Boolean(room.radiatorProductId) && (radiatorLine?.quantity ?? room.radiatorQuantity ?? 0) > 0
   })
   const materialDefaults = buildApproximateMaterials(survey, template, products)
-  const materials = survey.materials ?? materialDefaults
+  const savedMaterials = survey.materials ?? materialDefaults
+  const materials = materialDrafts ?? savedMaterials
+  const materialsDirty = materialDrafts !== null && JSON.stringify(materialDrafts) !== JSON.stringify(savedMaterials)
   const canEditMaterials = role === 'admin' || role === 'usta'
-  const updateMaterials = (next: ProjectMaterial[]) => updateSurvey({ ...survey, materials: next })
+  const updateMaterials = (next: ProjectMaterial[]) => { setMaterialDrafts(next); setMaterialError('') }
   const updateMaterial = (id: string, patch: Partial<ProjectMaterial>) => updateMaterials(materials.map((item) => item.id === id ? { ...item, ...patch } : item))
   const addMaterial = () => {
     if (!newMaterial.label.trim()) return
     updateMaterials([...materials, { id: `survey-material-${Date.now()}`, label: newMaterial.label.trim(), quantity: Math.max(0, newMaterial.quantity), unit: newMaterial.unit.trim() || 'adet', prepared: false }])
     setNewMaterial({ label: '', quantity: 1, unit: 'adet' })
+  }
+  const saveMaterials = async () => {
+    if (!materialsDirty) return
+    setMaterialSaving(true)
+    setMaterialError('')
+    try {
+      await updateSurveyWithAudit({ ...survey, materials })
+      setMaterialDrafts(null)
+    } catch {
+      setMaterialError('Malzeme değişiklikleri buluta kaydedilemedi. İnternet bağlantısını kontrol edip yeniden deneyin.')
+    } finally {
+      setMaterialSaving(false)
+    }
   }
   const exportMaterials = () => {
     const rows = [['Sıra', 'Kontrol', 'Malzeme', 'Miktar', 'Birim', 'Not'], ...materials.map((item, index) => [String(index + 1), item.prepared ? '☑' : '☐', item.label, String(item.quantity), item.unit, ''])]
@@ -60,7 +84,7 @@ export function SurveyDetailModal({ surveyId, onClose }: { surveyId: string | nu
     popup.document.close()
   }
 
-  return <Modal open onClose={onClose} eyebrow="KEŞİF İÇERİĞİ" title={`${survey.id} · ${survey.type}`} wide>
+  return <Modal open onClose={() => { if (!materialSaving) onClose() }} eyebrow="KEŞİF İÇERİĞİ" title={`${survey.id} · ${survey.type}`} wide>
     <div className="survey-detail-modal">
       <section className="survey-detail-hero">
         <div>
@@ -125,10 +149,23 @@ export function SurveyDetailModal({ surveyId, onClose }: { surveyId: string | nu
       </section>
 
       <section className="survey-detail-section survey-material-section">
-        <header className="survey-material-head"><div><Package size={17} /><span><strong>Malzeme checklist</strong><small>{materials.length} kalem · keşif ve şablondan yaklaşık oluşturulur</small></span></div><div className="survey-material-actions">{canEditMaterials && <button onClick={() => updateMaterials(materialDefaults)}><RotateCcw size={14} /> Yeniden oluştur</button>}<button onClick={printMaterials}><Printer size={14} /> PDF checklist</button><button onClick={exportMaterials}><FileSpreadsheet size={14} /> Excel</button></div></header>
+        <header className="survey-material-head"><div><Package size={17} /><span><strong>Malzeme checklist</strong><small>{materials.length} kalem · keşif ve şablondan yaklaşık oluşturulur</small></span></div><div className="survey-material-actions">{canEditMaterials && <button onClick={() => updateMaterials(materialDefaults)} disabled={materialSaving}><RotateCcw size={14} /> Yeniden oluştur</button>}{canEditMaterials && materialsDirty && <button className="primary-button" onClick={() => { void saveMaterials() }} disabled={materialSaving}><Save size={14} /> {materialSaving ? 'Kaydediliyor…' : 'Değişiklikleri kaydet'}</button>}<button onClick={printMaterials}><Printer size={14} /> PDF checklist</button><button onClick={exportMaterials}><FileSpreadsheet size={14} /> Excel</button></div></header>
         <div className="survey-material-table"><div className="survey-material-table-head"><span>Kontrol</span><span>Malzeme</span><span>Miktar</span><span>Birim</span><span /></div>{materials.map((material) => <div className="survey-material-row" key={material.id}><button disabled={!canEditMaterials} className={material.prepared ? 'checked' : ''} onClick={() => updateMaterial(material.id, { prepared: !material.prepared })}>{material.prepared && <Check size={13} />}</button><input disabled={!canEditMaterials} value={material.label} onChange={(event) => updateMaterial(material.id, { label: event.target.value })} /><input disabled={!canEditMaterials} type="number" min="0" value={material.quantity} onChange={(event) => updateMaterial(material.id, { quantity: Math.max(0, Number(event.target.value)) })} /><input disabled={!canEditMaterials} value={material.unit} onChange={(event) => updateMaterial(material.id, { unit: event.target.value })} />{canEditMaterials ? <button className="survey-material-delete" onClick={() => updateMaterials(materials.filter((item) => item.id !== material.id))}><Trash2 size={14} /></button> : <span />}</div>)}{materials.length === 0 && <p className="survey-detail-empty">Malzeme kalemi bulunmuyor. Aşağıdan ekleyebilir veya şablondan yeniden oluşturabilirsiniz.</p>}</div>
         {canEditMaterials && <div className="survey-material-add"><input value={newMaterial.label} onChange={(event) => setNewMaterial({ ...newMaterial, label: event.target.value })} placeholder="Yeni malzeme" /><input type="number" min="0" value={newMaterial.quantity} onChange={(event) => setNewMaterial({ ...newMaterial, quantity: Number(event.target.value) })} /><input value={newMaterial.unit} onChange={(event) => setNewMaterial({ ...newMaterial, unit: event.target.value })} /><button onClick={addMaterial}><Plus size={14} /> Ekle</button></div>}
+        {materialError && <div className="auth-message error">{materialError}</div>}
       </section>
+
+      {role === 'admin' && <section className="survey-detail-section survey-audit-section">
+        <header><div><History size={17} /><span><strong>Değişiklik geçmişi</strong><small>{auditLog.length} kayıt · yalnız yöneticiler görebilir</small></span></div></header>
+        {auditLog.length === 0 ? <p className="survey-detail-empty">Bu keşif için henüz kayıtlı bir değişiklik bulunmuyor.</p> : <div className="survey-audit-list">{auditLog.map((entry) => <article key={entry.id}>
+          <header><strong>{entry.actorName}</strong><time>{new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(entry.createdAt))}</time></header>
+          <div>{entry.changes.map((change, index) => {
+            const before = change.kind === 'price' ? formatCurrency(Number(change.before) || 0) : change.before
+            const after = change.kind === 'price' ? formatCurrency(Number(change.after) || 0) : change.after
+            return <p className={change.kind === 'price' ? 'price-change' : ''} key={`${change.field}-${index}`}><span>{change.field}</span><del>{before}</del><b>→</b><ins>{after}</ins></p>
+          })}</div>
+        </article>)}</div>}
+      </section>}
 
       {attachments.length > 0 && <section className="survey-detail-section">
         <header><div><Camera size={17} /><span><strong>Keşif fotoğrafları</strong><small>{attachments.length} fotoğraf</small></span></div></header>
