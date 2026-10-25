@@ -1,10 +1,12 @@
-import { Check, Clock3, Edit3, PackageSearch, Plus, Search, TrendingUp } from 'lucide-react'
+import { Check, Clock3, Edit3, PackageSearch, Plus, Search, Trash2, TrendingUp } from 'lucide-react'
 import { useState } from 'react'
 import { Modal } from '../components/Modal'
 import { workItemDefinitions } from '../data'
 import { useApp } from '../context/AppContext'
 import { formatCurrency } from '../lib/domain'
-import type { Product, SurveyTemplate, SurveyType } from '../types'
+import { sortNewestFirst } from '../lib/domain'
+import { templateMaterialItems } from '../lib/materials'
+import type { MaterialTemplateItem, Product, SurveyTemplate, SurveyType } from '../types'
 
 export function Catalog() {
   const { products, templates, addTemplate } = useApp()
@@ -15,6 +17,7 @@ export function Catalog() {
   const filtered = products.filter((product) => `${product.code} ${product.name} ${product.category} ${product.brand} ${product.variant}`.toLocaleLowerCase('tr-TR').includes(query.toLocaleLowerCase('tr-TR')))
   const averageMargin = Math.round(products.reduce((sum, item) => sum + (item.sale - item.cost) / item.sale, 0) / products.length * 100)
   const historyProduct = products.find((product) => product.id === historyProductId)
+  const sortedTemplates = sortNewestFirst(templates)
 
   return <div className="page-stack">
     <section className="page-title-row"><div><span className="eyebrow">KATALOG VE ŞABLON YÖNETİMİ</span><h1>Ürün, fiyat & şablonlar</h1><p>Alış/satış fiyatlarını, fiyat geçmişini ve keşif şablonlarını yönetin.</p></div>{tab === 'templates' && <button className="primary-button" onClick={() => setNewTemplateOpen(true)}><Plus size={16} /> Yeni şablon</button>}</section>
@@ -23,7 +26,7 @@ export function Catalog() {
     {tab === 'prices' ? <>
       <section className="toolbar panel"><label className="list-search"><Search size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ürün, marka, boyut veya kategori ara…" /></label><div className="result-count"><strong>{filtered.length}</strong> kalem</div></section>
       <section className="panel table-panel"><div className="data-table catalog-table"><div className="table-row table-head"><span>Ürün / hizmet</span><span>Kategori</span><span>Birim</span><span>Alış</span><span>Satış</span><span>Marj</span><span /></div>{filtered.map((product) => <ProductRow product={product} onHistory={() => setHistoryProductId(product.id)} key={product.id} />)}</div></section>
-    </> : <section className="template-admin-grid">{templates.map((template) => <TemplateCard template={template} key={template.id} />)}</section>}
+    </> : <section className="template-admin-grid">{sortedTemplates.map((template) => <TemplateCard template={template} key={template.id} />)}</section>}
     <Modal open={Boolean(historyProduct)} onClose={() => setHistoryProductId(null)} eyebrow="FİYAT GEÇMİŞİ" title={historyProduct?.name ?? 'Fiyat geçmişi'}>
       {historyProduct && <div className="price-history-list"><div className="price-history-head"><span>Tarih</span><span>Alış</span><span>Satış</span></div>{[...(historyProduct.priceHistory ?? [])].reverse().map((entry, index) => <div key={entry.id}><span><Clock3 size={14} /> {new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(entry.date))}{index === 0 && <em>Güncel</em>}</span><strong>{formatCurrency(entry.cost)}</strong><strong>{formatCurrency(entry.sale)}</strong></div>)}</div>}
     </Modal>
@@ -48,10 +51,28 @@ function TemplateCard({ template }: { template: SurveyTemplate }) {
   const { updateTemplate } = useApp()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(template)
+  const [newMaterial, setNewMaterial] = useState({ label: '', quantity: 1, unit: 'adet' })
   const definitions = workItemDefinitions.filter((item) => item.type === template.type)
   const toggle = (key: string) => setDraft((current) => ({ ...current, workItemKeys: current.workItemKeys.includes(key) ? current.workItemKeys.filter((item) => item !== key) : [...current.workItemKeys, key] }))
   const save = () => { updateTemplate(draft); setEditing(false) }
-  return <article className="template-admin-card panel"><header><div><span>{template.type}</span>{editing ? <input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /> : <h3>{template.name}</h3>}</div><button onClick={() => setEditing((value) => !value)}>{editing ? 'Vazgeç' : <><Edit3 size={14} /> Düzenle</>}</button></header><div className="template-items">{definitions.map((item) => editing ? <label key={item.key}><input type="checkbox" checked={draft.workItemKeys.includes(item.key)} onChange={() => toggle(item.key)} /> {item.label}</label> : template.workItemKeys.includes(item.key) && <span key={item.key}><Check size={12} /> {item.label}</span>)}</div>{editing && <footer><button className="primary-button" onClick={save}>Şablonu kaydet</button></footer>}</article>
+  const materials = editing ? (draft.materialItems ?? []) : templateMaterialItems(template)
+  const startEditing = () => {
+    setDraft({ ...template, materialItems: templateMaterialItems(template) })
+    setEditing(true)
+  }
+  const updateMaterial = (id: string, patch: Partial<MaterialTemplateItem>) => setDraft((current) => ({ ...current, materialItems: (current.materialItems ?? []).map((item) => item.id === id ? { ...item, ...patch } : item) }))
+  const removeMaterial = (id: string) => setDraft((current) => ({ ...current, materialItems: (current.materialItems ?? []).filter((item) => item.id !== id) }))
+  const addMaterial = () => {
+    if (!newMaterial.label.trim()) return
+    setDraft((current) => ({ ...current, materialItems: [...(current.materialItems ?? []), { id: `mt-${Date.now()}`, ...newMaterial, label: newMaterial.label.trim() }] }))
+    setNewMaterial({ label: '', quantity: 1, unit: 'adet' })
+  }
+  return <article className="template-admin-card panel">
+    <header><div><span>{template.type}</span>{editing ? <input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /> : <h3>{template.name}</h3>}</div><button onClick={() => editing ? setEditing(false) : startEditing()}>{editing ? 'Vazgeç' : <><Edit3 size={14} /> Düzenle</>}</button></header>
+    <div className="template-items">{definitions.map((item) => editing ? <label key={item.key}><input type="checkbox" checked={draft.workItemKeys.includes(item.key)} onChange={() => toggle(item.key)} /> {item.label}</label> : template.workItemKeys.includes(item.key) && <span key={item.key}><Check size={12} /> {item.label}</span>)}</div>
+    <section className="template-materials"><div><strong>Yaklaşık malzeme şablonu</strong><small>Projeye aktarılır; usta veya yönetici miktarları iş bazında değiştirebilir.</small></div>{editing ? <><div className="template-material-editor">{materials.map((item) => <div className="template-material-row" key={item.id}><input value={item.label} onChange={(event) => updateMaterial(item.id, { label: event.target.value })} /><input type="number" min="0" value={item.quantity} onChange={(event) => updateMaterial(item.id, { quantity: Number(event.target.value) })} /><input value={item.unit} onChange={(event) => updateMaterial(item.id, { unit: event.target.value })} /><button onClick={() => removeMaterial(item.id)}><Trash2 size={14} /></button></div>)}</div><div className="template-material-add"><input value={newMaterial.label} onChange={(event) => setNewMaterial({ ...newMaterial, label: event.target.value })} placeholder="Yeni malzeme" /><input type="number" min="0" value={newMaterial.quantity} onChange={(event) => setNewMaterial({ ...newMaterial, quantity: Number(event.target.value) })} /><input value={newMaterial.unit} onChange={(event) => setNewMaterial({ ...newMaterial, unit: event.target.value })} /><button onClick={addMaterial}><Plus size={14} /> Ekle</button></div></> : <div className="template-material-preview">{materials.map((item) => <span key={item.id}><Check size={12} /> {item.label}<b>{item.quantity} {item.unit}</b></span>)}{materials.length === 0 && <small>Bu şablonda yaklaşık malzeme bulunmuyor.</small>}</div>}</section>
+    {editing && <footer><button className="primary-button" onClick={save}>Şablonu kaydet</button></footer>}
+  </article>
 }
 
 function NewTemplateModal({ open, onClose, onSave }: { open: boolean; onClose: () => void; onSave: (template: Omit<SurveyTemplate, 'id'>) => void }) {

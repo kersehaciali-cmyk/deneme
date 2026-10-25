@@ -20,6 +20,8 @@ Uygulama Supabase üzerinde çalışır:
 - Telefon ve bilgisayarlar arasında anlık veri eşitleme
 - Özel dosya alanında fotoğraf ve video saklama
 - Şirket ve rol bazlı veritabanı güvenlik kuralları
+- Keşif ve şablondan otomatik yaklaşık malzeme listesi
+- Usta/yönetici malzeme düzenleme ve checklist PDF/Excel çıktısı
 
 Şifreler uygulama kayıtlarında tutulmaz. Kimlik doğrulama servisi tarafından güvenli biçimde yönetilir. Supabase `service_role` anahtarı hiçbir zaman masaüstü, web veya mobil uygulamanın `.env` dosyasına yazılmamalıdır.
 

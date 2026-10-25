@@ -96,6 +96,16 @@ export interface SurveyTemplate {
   name: string
   type: SurveyType
   workItemKeys: string[]
+  materialItems?: MaterialTemplateItem[]
+  createdAt?: string
+}
+
+export interface MaterialTemplateItem {
+  id: string
+  productId?: string
+  label: string
+  quantity: number
+  unit: string
 }
 
 export interface WorkItemDefinition {
@@ -115,6 +125,8 @@ export interface Job {
   id: string
   customerId: string
   projectId?: string
+  createdAt?: string
+  assignedMasterId?: string
   title: string
   assignee: string
   appointment: string
@@ -140,6 +152,7 @@ export interface Project {
   surveyId?: string
   assignedMasterId?: string
   applicationDate?: string
+  materialTemplateId?: string
   materials?: ProjectMaterial[]
   attachments?: ProjectAttachment[]
   adminApproved?: boolean
@@ -174,6 +187,7 @@ export interface ProjectAttachment {
 export interface Payment {
   id: string
   customerId: string
+  createdAt?: string
   description: string
   amount: number
   paid: number

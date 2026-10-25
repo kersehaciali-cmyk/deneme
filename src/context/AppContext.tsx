@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { acStages, gasStages, heatPumpStages, plumbingStages, seedCustomers, seedJobs, seedPayments, seedProducts, seedProjects, seedSurveys, seedTemplates } from '../data'
 import { supabase } from '../lib/supabase'
+import { buildApproximateMaterials } from '../lib/materials'
 import type { AppUser, Customer, Job, Payment, Product, Project, Role, Survey, SurveyTemplate } from '../types'
 import { useAuth } from './AuthContext'
 
@@ -34,6 +35,20 @@ interface AppState {
 }
 
 const AppContext = createContext<AppState | undefined>(undefined)
+
+async function functionErrorMessage(error: unknown) {
+  const fallback = error instanceof Error ? error.message : 'Sunucu işlemi tamamlanamadı.'
+  const response = (error as { context?: unknown })?.context
+  if (!(response instanceof Response)) return fallback
+  if (response.status === 404) return 'Kullanıcı oluşturma servisi Supabase üzerinde yayınlanmamış. Yönetici kurulumu tamamlamalıdır.'
+  if (response.status === 401) return 'Oturum doğrulanamadı. Çıkış yapıp yeniden giriş yapın.'
+  try {
+    const payload = await response.clone().json() as { error?: string; message?: string }
+    return payload.error ?? payload.message ?? fallback
+  } catch {
+    return fallback
+  }
+}
 
 interface CloudRecord {
   entity_type: EntityType
@@ -138,13 +153,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addUser: async (user, password) => {
       if (!supabase) throw new Error('Bulut bağlantısı bulunamadı.')
       const { error } = await supabase.functions.invoke('admin-users', { body: { action: 'create', user, password: password || undefined } })
-      if (error) throw error
+      if (error) throw new Error(await functionErrorMessage(error))
       await loadCloudData()
     },
     updateUser: async (user, password) => {
       if (!supabase) throw new Error('Bulut bağlantısı bulunamadı.')
       const { error } = await supabase.functions.invoke('admin-users', { body: { action: 'update', user, password: password || undefined } })
-      if (error) throw error
+      if (error) throw new Error(await functionErrorMessage(error))
       await loadCloudData()
     },
     customers,
@@ -159,8 +174,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updateSurvey: (survey) => { setSurveys((current) => current.map((item) => item.id === survey.id ? survey : item)); saveRecord('survey', survey) },
     templates,
     addTemplate: (input) => {
-      const template = { ...input, id: `tpl-${Date.now()}` }
-      setTemplates((current) => [...current, template])
+      const template = { ...input, id: `tpl-${Date.now()}`, createdAt: new Date().toISOString() }
+      setTemplates((current) => [template, ...current])
       saveRecord('template', template)
     },
     updateTemplate: (template) => { setTemplates((current) => current.map((item) => item.id === template.id ? template : item)); saveRecord('template', template) },
@@ -185,15 +200,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const stages = survey.type === 'Doğalgaz' ? gasStages : survey.type === 'Isı Pompası' ? heatPumpStages : survey.type === 'Klima' ? acStages : plumbingStages
       const due = new Date(`${applicationDate}T12:00:00`)
       due.setDate(due.getDate() + 30)
-      const materials = survey.lines.map((line) => {
-        const product = products.find((item) => item.id === line.productId)
-        return { id: `mat-${line.id}`, productId: line.productId, label: product ? `${product.name}${product.variant ? ` · ${product.variant}` : ''}` : line.productId, quantity: line.quantity, unit: product?.unit ?? 'adet', prepared: false }
-      })
-      const project: Project = { id: `PRJ-${Date.now()}`, customerId: survey.customerId, surveyId, type: survey.type, createdAt: new Date().toISOString().slice(0, 10), currentStage: 0, stages, owner: manager?.name ?? 'Proje Takipçisi', ownerId: manager?.id, dueDate: due.toISOString().slice(0, 10), assignedMasterId: masterId, applicationDate, siteAddress: survey.siteAddress, siteContactName: survey.siteContactName, siteContactPhone: survey.siteContactPhone, latitude: survey.latitude, longitude: survey.longitude, materials, attachments: [], adminApproved: false }
+      const template = templates.find((item) => item.id === survey.templateId)
+      const materials = buildApproximateMaterials(survey, template, products)
+      const project: Project = { id: `PRJ-${Date.now()}`, customerId: survey.customerId, surveyId, type: survey.type, createdAt: new Date().toISOString(), currentStage: 0, stages, owner: manager?.name ?? 'Proje Takipçisi', ownerId: manager?.id, dueDate: due.toISOString().slice(0, 10), assignedMasterId: masterId, applicationDate, materialTemplateId: template?.id, siteAddress: survey.siteAddress, siteContactName: survey.siteContactName, siteContactPhone: survey.siteContactPhone, latitude: survey.latitude, longitude: survey.longitude, materials, attachments: [], adminApproved: false }
       const nextSurvey = { ...survey, status: 'Projeye Dönüştü' as const }
       const customer = customers.find((item) => item.id === survey.customerId)
       const nextCustomer = customer ? { ...customer, openProjectCount: customer.openProjectCount + 1 } : undefined
-      const job: Job = { id: `IS-${Date.now()}`, customerId: survey.customerId, projectId: project.id, title: `${survey.type} uygulaması`, assignee: master?.name ?? 'Atanmadı', appointment: applicationDate, status: 'Planlandı', siteAddress: survey.siteAddress, siteContactName: survey.siteContactName, siteContactPhone: survey.siteContactPhone, latitude: survey.latitude, longitude: survey.longitude, checklist: materials.map((material) => ({ id: `check-${material.id}`, label: `${material.label} · ${material.quantity} ${material.unit}`, done: false })) }
+      const job: Job = { id: `IS-${Date.now()}`, customerId: survey.customerId, projectId: project.id, createdAt: new Date().toISOString(), assignedMasterId: masterId, title: `${survey.type} uygulaması`, assignee: master?.name ?? 'Atanmadı', appointment: applicationDate, status: 'Planlandı', siteAddress: survey.siteAddress, siteContactName: survey.siteContactName, siteContactPhone: survey.siteContactPhone, latitude: survey.latitude, longitude: survey.longitude, checklist: materials.map((material) => ({ id: `check-${material.id}`, label: `${material.label} · ${material.quantity} ${material.unit}`, done: false })) }
       setProjects((current) => [project, ...current]); saveRecord('project', project)
       setSurveys((current) => current.map((item) => item.id === surveyId ? nextSurvey : item)); saveRecord('survey', nextSurvey)
       if (nextCustomer) { setCustomers((current) => current.map((item) => item.id === nextCustomer.id ? nextCustomer : item)); saveRecord('customer', nextCustomer) }

@@ -18,7 +18,7 @@ export function Users() {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
-  const filtered = useMemo(() => users.filter((user) => `${user.name} ${user.phone} ${user.email} ${roleLabels[user.role]}`.toLocaleLowerCase('tr-TR').includes(query.toLocaleLowerCase('tr-TR'))), [query, users])
+  const filtered = useMemo(() => users.filter((user) => `${user.name} ${user.phone} ${user.email} ${roleLabels[user.role]}`.toLocaleLowerCase('tr-TR').includes(query.toLocaleLowerCase('tr-TR'))).sort((a, b) => a.name.localeCompare(b.name, 'tr-TR')), [query, users])
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()

@@ -6,7 +6,7 @@ import { MediaPreview } from '../components/MediaPreview'
 import { SurveyDetailModal } from '../components/SurveyDetailModal'
 import { workItemDefinitions } from '../data'
 import { useApp } from '../context/AppContext'
-import { calculateSurveyTotals, formatCurrency } from '../lib/domain'
+import { calculateSurveyTotals, formatCurrency, sortNewestFirst } from '../lib/domain'
 import { deleteMediaFile, saveMediaFile } from '../lib/mediaStore'
 import type { Product, Role, Room, Survey, SurveyAttachment, SurveyLine, SurveyStatus, SurveyTemplate, SurveyType } from '../types'
 
@@ -64,10 +64,10 @@ export function Surveys() {
   const [applicationDate, setApplicationDate] = useState(new Date().toISOString().slice(0, 10))
   const hidePrices = role === 'usta'
   const canManage = role === 'admin' || role === 'proje'
-  const filtered = surveys.filter((survey) => {
+  const filtered = sortNewestFirst(surveys.filter((survey) => {
     const customer = customers.find((item) => item.id === survey.customerId)
     return `${survey.id} ${survey.type} ${customer?.name} ${survey.status}`.toLocaleLowerCase('tr-TR').includes(query.toLocaleLowerCase('tr-TR'))
-  })
+  }))
 
   const convert = () => {
     if (!conversion || !masterId || !applicationDate) return
@@ -149,7 +149,7 @@ function SurveyWizard({ open, onClose }: { open: boolean; onClose: () => void })
   const selectedAc = acProducts.find((product) => product.id === acProductId)
   const radiatorKey = type === 'Isı Pompası' ? 'radyator-ip' : 'radyator-dg'
   const hasRadiators = workItemKeys.includes(radiatorKey)
-  const filteredCustomers = customers.filter((customer) => `${customer.name} ${customer.phone} ${customer.district}`.toLocaleLowerCase('tr-TR').includes(customerQuery.toLocaleLowerCase('tr-TR')))
+  const filteredCustomers = customers.filter((customer) => `${customer.name} ${customer.phone} ${customer.district}`.toLocaleLowerCase('tr-TR').includes(customerQuery.toLocaleLowerCase('tr-TR'))).sort((a, b) => a.name.localeCompare(b.name, 'tr-TR'))
   const availableProducts = products.filter((product) => {
     if (product.group === 'Kombi' || product.group === 'Radyatör' || product.group === 'Isı Pompası' || product.group === 'Klima') return false
     if (product.group === 'İşçilik') return true

@@ -10,7 +10,7 @@ export function Customers() {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [profile, setProfile] = useState<ProfileSubject | null>(null)
-  const filtered = useMemo(() => customers.filter((item) => `${item.name} ${item.phone} ${item.district}`.toLocaleLowerCase('tr-TR').includes(query.toLocaleLowerCase('tr-TR'))), [customers, query])
+  const filtered = useMemo(() => customers.filter((item) => `${item.name} ${item.phone} ${item.district}`.toLocaleLowerCase('tr-TR').includes(query.toLocaleLowerCase('tr-TR'))).sort((a, b) => a.name.localeCompare(b.name, 'tr-TR')), [customers, query])
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()

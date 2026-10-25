@@ -2,7 +2,7 @@ import { ArrowRight, CalendarClock, CheckCircle2, ClipboardPlus, Clock3, Package
 import { useState } from 'react'
 import { EntityDetailModal, type ProfileSubject } from '../components/EntityDetailModal'
 import { useApp } from '../context/AppContext'
-import { formatCurrency } from '../lib/domain'
+import { formatCurrency, sortProjectsNewestFirst } from '../lib/domain'
 import type { PageKey } from '../types'
 
 const appointmentDate = (value: string) => new Date(`${value.slice(0, 10)}T12:00:00`)
@@ -17,7 +17,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (page: PageKey) => void 
   const activeProjects = projects.filter((project) => project.currentStage < project.stages.length - 1).length
   const recentSurveys = [...surveys].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 3)
   const completedJobList = jobs.filter((job) => job.status === 'Tamamlandı').sort((a, b) => b.appointment.localeCompare(a.appointment)).slice(0, 3)
-  const approvalProjects = projects.filter((project) => project.stages[project.currentStage]?.toLocaleLowerCase('tr-TR').includes('onaya gönderildi')).slice(0, 3)
+  const approvalProjects = sortProjectsNewestFirst(projects.filter((project) => project.stages[project.currentStage]?.toLocaleLowerCase('tr-TR').includes('onaya gönderildi'))).slice(0, 3)
   const isCustomer = role === 'musteri'
   const isMaster = role === 'usta'
   const openFilteredList = (page: 'jobs' | 'projects', filter: string) => {

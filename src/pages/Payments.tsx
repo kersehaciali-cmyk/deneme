@@ -3,16 +3,16 @@ import { useState } from 'react'
 import { Modal } from '../components/Modal'
 import { EntityDetailModal, type ProfileSubject } from '../components/EntityDetailModal'
 import { useApp } from '../context/AppContext'
-import { formatCurrency } from '../lib/domain'
+import { formatCurrency, sortNewestFirst } from '../lib/domain'
 import type { Payment } from '../types'
 
 export function Payments() {
-  const { payments, customers, updatePayment, role } = useApp()
+  const { payments, customers, updatePayment, role, currentUser } = useApp()
   const [selected, setSelected] = useState<Payment | null>(null)
   const [profile, setProfile] = useState<ProfileSubject | null>(null)
   const total = payments.reduce((sum, item) => sum + item.amount, 0)
   const paid = payments.reduce((sum, item) => sum + item.paid, 0)
-  const visible = role === 'musteri' ? payments.filter((payment) => payment.customerId === 'mus-001') : payments
+  const visible = sortNewestFirst(role === 'musteri' ? payments.filter((payment) => payment.customerId === currentUser.customerId) : payments)
 
   const recordPayment = (amount: number) => {
     if (!selected) return

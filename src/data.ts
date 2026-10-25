@@ -1,4 +1,4 @@
-import type { AppUser, Customer, Job, Payment, Product, Project, Survey, SurveyTemplate, WorkItemDefinition } from './types'
+import type { AppUser, Customer, Job, MaterialTemplateItem, Payment, Product, Project, Survey, SurveyTemplate, WorkItemDefinition } from './types'
 
 export const seedCustomers: Customer[] = [
   {
@@ -184,6 +184,64 @@ export const workItemDefinitions: WorkItemDefinition[] = [
   { key: 'pis-su', label: 'Pis su tesisatı', type: 'Sıhhi Tesisat', description: 'Atık su hattı uygulaması' },
   { key: 'klima', label: 'Klima', type: 'Klima', description: 'Marka ve BTU seçimi' },
 ]
+
+export const defaultMaterialTemplates: Record<string, MaterialTemplateItem[]> = {
+  'tpl-dg-mustakil': [
+    { id: 'mt-dg-01', label: 'Kombi bağlantı seti', quantity: 1, unit: 'set' },
+    { id: 'mt-dg-02', label: 'Gaz vanası ve filtre seti', quantity: 1, unit: 'set' },
+    { id: 'mt-dg-03', label: 'Dirsek, te ve manşon karışık', quantity: 1, unit: 'kutu' },
+    { id: 'mt-dg-04', label: 'Boru kelepçesi', quantity: 30, unit: 'adet' },
+    { id: 'mt-dg-05', label: 'Dübel ve vida', quantity: 30, unit: 'adet' },
+    { id: 'mt-dg-06', label: 'Sızdırmazlık malzemesi', quantity: 2, unit: 'adet' },
+  ],
+  'tpl-dg-kolon': [
+    { id: 'mt-kolon-01', label: 'Kolon kelepçesi', quantity: 25, unit: 'adet' },
+    { id: 'mt-kolon-02', label: 'Kaynak dirseği ve manşon', quantity: 1, unit: 'kutu' },
+    { id: 'mt-kolon-03', label: 'Antipas boya', quantity: 2, unit: 'kutu' },
+    { id: 'mt-kolon-04', label: 'Dübel ve çelik vida', quantity: 25, unit: 'adet' },
+  ],
+  'tpl-dg-daire': [
+    { id: 'mt-daire-01', label: 'Kombi bağlantı seti', quantity: 1, unit: 'set' },
+    { id: 'mt-daire-02', label: 'Radyatör vana ve dönüş seti', quantity: 1, unit: 'set' },
+    { id: 'mt-daire-03', label: 'Dirsek, te ve manşon karışık', quantity: 1, unit: 'kutu' },
+    { id: 'mt-daire-04', label: 'Boru kelepçesi', quantity: 20, unit: 'adet' },
+    { id: 'mt-daire-05', label: 'Dübel ve vida', quantity: 20, unit: 'adet' },
+    { id: 'mt-daire-06', label: 'Sızdırmazlık malzemesi', quantity: 2, unit: 'adet' },
+  ],
+  'tpl-dg-kombi': [
+    { id: 'mt-kombi-01', label: 'Kombi bağlantı seti', quantity: 1, unit: 'set' },
+    { id: 'mt-kombi-02', label: 'Pislik tutucu filtre', quantity: 1, unit: 'adet' },
+    { id: 'mt-kombi-03', label: 'Kombi montaj dübeli', quantity: 1, unit: 'set' },
+    { id: 'mt-kombi-04', label: 'Sızdırmazlık malzemesi', quantity: 1, unit: 'adet' },
+  ],
+  'tpl-ip-standart': [
+    { id: 'mt-ip-01', label: 'Isı pompası bağlantı seti', quantity: 1, unit: 'set' },
+    { id: 'mt-ip-02', label: 'Küresel vana', quantity: 4, unit: 'adet' },
+    { id: 'mt-ip-03', label: 'Pislik tutucu filtre', quantity: 1, unit: 'adet' },
+    { id: 'mt-ip-04', label: 'Antifriz', quantity: 20, unit: 'litre' },
+    { id: 'mt-ip-05', label: 'Boru ek parçaları', quantity: 1, unit: 'kutu' },
+  ],
+  'tpl-ip-yerden': [
+    { id: 'mt-ipy-01', label: 'Isı pompası bağlantı seti', quantity: 1, unit: 'set' },
+    { id: 'mt-ipy-02', label: 'Küresel vana', quantity: 4, unit: 'adet' },
+    { id: 'mt-ipy-03', label: 'Yerden ısıtma bağlantı seti', quantity: 1, unit: 'set' },
+    { id: 'mt-ipy-04', label: 'Antifriz', quantity: 20, unit: 'litre' },
+    { id: 'mt-ipy-05', label: 'Boru ek parçaları', quantity: 1, unit: 'kutu' },
+  ],
+  'tpl-st-tam': [
+    { id: 'mt-st-01', label: 'Temiz su ek parçaları', quantity: 1, unit: 'kutu' },
+    { id: 'mt-st-02', label: 'Pis su ek parçaları', quantity: 1, unit: 'kutu' },
+    { id: 'mt-st-03', label: 'Boru kelepçesi', quantity: 30, unit: 'adet' },
+    { id: 'mt-st-04', label: 'Sızdırmazlık ve sarf seti', quantity: 1, unit: 'set' },
+  ],
+  'tpl-klima-standart': [
+    { id: 'mt-klima-01', label: 'Bakır boru', quantity: 5, unit: 'metre' },
+    { id: 'mt-klima-02', label: 'Drenaj hortumu', quantity: 5, unit: 'metre' },
+    { id: 'mt-klima-03', label: 'Enerji ve haberleşme kablosu', quantity: 8, unit: 'metre' },
+    { id: 'mt-klima-04', label: 'Dış ünite konsolu', quantity: 1, unit: 'set' },
+    { id: 'mt-klima-05', label: 'Titreşim takozu', quantity: 4, unit: 'adet' },
+  ],
+}
 
 export const seedTemplates: SurveyTemplate[] = [
   { id: 'tpl-dg-mustakil', name: 'Müstakil Doğalgaz', type: 'Doğalgaz', workItemKeys: ['gaz-hatti', 'kombi', 'radyator-dg', 'boru-dg', 'bransman', 'kalorifer', 'kollektor', 'ek-baca'] },

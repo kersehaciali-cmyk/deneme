@@ -36,11 +36,19 @@ export function isProjectClosed(project: Project) {
 }
 
 export function sortProjectsNewestFirst(projects: Project[]) {
-  const order = (project: Project) => {
-    if (project.createdAt) return Date.parse(`${project.createdAt}T12:00:00`)
-    return Number(project.id.match(/\d+/)?.[0] ?? 0)
+  return sortNewestFirst(projects)
+}
+
+export function sortNewestFirst<T extends { id: string; createdAt?: string }>(items: T[]) {
+  const order = (item: T) => {
+    if (item.createdAt) {
+      const timestamp = Date.parse(item.createdAt.includes('T') ? item.createdAt : `${item.createdAt}T12:00:00`)
+      if (Number.isFinite(timestamp)) return timestamp
+    }
+    const numericId = item.id.match(/\d+/g)?.join('')
+    return Number(numericId ?? 0)
   }
-  return [...projects].sort((a, b) => order(b) - order(a))
+  return [...items].sort((a, b) => order(b) - order(a))
 }
 
 export function directionsUrl(latitude?: number, longitude?: number, address?: string) {

@@ -1,16 +1,23 @@
-import { CalendarClock, Camera, Check, ChevronDown, ChevronRight, FileCheck2, FileSpreadsheet, Image, MapPin, MessageSquare, Navigation, PackageCheck, Phone, Plus, Printer, Trash2, UserRound, Video } from 'lucide-react'
+import { CalendarClock, Camera, Check, ChevronDown, ChevronRight, FileCheck2, FileSpreadsheet, Image, MapPin, MessageSquare, Navigation, PackageCheck, Phone, Plus, Printer, RotateCcw, Save, Trash2, UserRound, Video } from 'lucide-react'
 import { useState, type ChangeEvent } from 'react'
 import { EntityDetailModal, type ProfileSubject } from '../components/EntityDetailModal'
 import { MediaPreview } from '../components/MediaPreview'
 import { useApp } from '../context/AppContext'
 import { directionsUrl, isProjectClosed, projectProgress, sortProjectsNewestFirst } from '../lib/domain'
+import { buildApproximateMaterials } from '../lib/materials'
 import { deleteMediaFile, saveMediaFile } from '../lib/mediaStore'
 import type { Project, ProjectMaterial, Role, Survey } from '../types'
 
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character] ?? character)
+const preparationDate = (applicationDate?: string) => {
+  if (!applicationDate) return 'Belirlenmedi'
+  const date = new Date(`${applicationDate}T12:00:00`)
+  date.setDate(date.getDate() - 1)
+  return new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }).format(date)
+}
 
 export function Projects() {
-  const { projects, customers, users, surveys, updateProject, role } = useApp()
+  const { projects, customers, users, surveys, products, templates, jobs, updateProject, updateJob, updateTemplate, role, currentUser } = useApp()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [profile, setProfile] = useState<ProfileSubject | null>(null)
   const [filter, setFilter] = useState<'all' | 'open' | 'approval' | 'closed'>(() => {
@@ -22,17 +29,33 @@ export function Projects() {
     return 'all'
   })
   const [newMaterial, setNewMaterial] = useState({ label: '', quantity: 1, unit: 'adet' })
-  const roleProjects = role === 'musteri' ? projects.filter((project) => project.customerId === 'mus-001') : role === 'usta' ? projects.filter((project) => project.assignedMasterId === 'usr-002') : projects
+  const roleProjects = role === 'musteri' ? projects.filter((project) => project.customerId === currentUser.customerId) : role === 'usta' ? projects.filter((project) => project.assignedMasterId === currentUser.id) : projects
   const isApprovalWaiting = (project: Project) => project.stages[project.currentStage]?.toLocaleLowerCase('tr-TR').includes('onaya gönderildi') ?? false
   const visible = sortProjectsNewestFirst(roleProjects.filter((project) => filter === 'all' || (filter === 'open' && !isProjectClosed(project)) || (filter === 'closed' && isProjectClosed(project)) || (filter === 'approval' && isApprovalWaiting(project))))
 
-  const updateMaterial = (project: Project, material: ProjectMaterial) => updateProject({ ...project, materials: (project.materials ?? []).map((item) => item.id === material.id ? material : item) })
+  const replaceMaterials = (project: Project, materials: ProjectMaterial[]) => {
+    updateProject({ ...project, materials })
+    const job = jobs.find((item) => item.projectId === project.id)
+    if (job) updateJob({ ...job, checklist: materials.map((material) => ({ id: `check-${material.id}`, label: `${material.label} · ${material.quantity} ${material.unit}`, done: material.prepared })) })
+  }
+  const updateMaterial = (project: Project, material: ProjectMaterial) => replaceMaterials(project, (project.materials ?? []).map((item) => item.id === material.id ? material : item))
   const addMaterial = (project: Project) => {
     if (!newMaterial.label.trim()) return
-    updateProject({ ...project, materials: [...(project.materials ?? []), { id: `mat-${Date.now()}`, ...newMaterial, label: newMaterial.label.trim(), prepared: false }] })
+    replaceMaterials(project, [...(project.materials ?? []), { id: `mat-${Date.now()}`, ...newMaterial, label: newMaterial.label.trim(), prepared: false }])
     setNewMaterial({ label: '', quantity: 1, unit: 'adet' })
   }
-  const removeMaterial = (project: Project, id: string) => updateProject({ ...project, materials: (project.materials ?? []).filter((item) => item.id !== id) })
+  const removeMaterial = (project: Project, id: string) => replaceMaterials(project, (project.materials ?? []).filter((item) => item.id !== id))
+  const applyMaterialTemplate = (project: Project) => {
+    const survey = surveys.find((item) => item.id === project.surveyId)
+    const template = templates.find((item) => item.id === (project.materialTemplateId ?? survey?.templateId))
+    replaceMaterials(project, buildApproximateMaterials(survey, template, products))
+  }
+  const saveMaterialsToTemplate = (project: Project) => {
+    const survey = surveys.find((item) => item.id === project.surveyId)
+    const template = templates.find((item) => item.id === (project.materialTemplateId ?? survey?.templateId))
+    if (!template) return
+    updateTemplate({ ...template, materialItems: (project.materials ?? []).map((item, index) => ({ id: `mt-saved-${index + 1}`, productId: item.productId, label: item.label, quantity: item.quantity, unit: item.unit })) })
+  }
   const upload = (project: Project, event: ChangeEvent<HTMLInputElement>) => {
     const files = [...(event.target.files ?? [])]
     const attachments = files.map((file, index) => {
@@ -44,7 +67,7 @@ export function Projects() {
     event.target.value = ''
   }
   const exportExcel = (project: Project) => {
-    const rows = [['Malzeme', 'Miktar', 'Birim', 'Hazır'], ...(project.materials ?? []).map((item) => [item.label, String(item.quantity), item.unit, item.prepared ? 'Evet' : 'Hayır'])]
+    const rows = [['Sıra', 'Kontrol', 'Malzeme', 'Miktar', 'Birim', 'Not'], ...(project.materials ?? []).map((item, index) => [String(index + 1), item.prepared ? '☑' : '☐', item.label, String(item.quantity), item.unit, ''])]
     const blob = new Blob([`\ufeff${rows.map((row) => row.join('\t')).join('\n')}`], { type: 'application/vnd.ms-excel;charset=utf-8' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
@@ -56,8 +79,9 @@ export function Projects() {
     const customer = customers.find((item) => item.id === project.customerId)
     const popup = window.open('', '_blank', 'width=850,height=700')
     if (!popup) return
-    const rows = (project.materials ?? []).map((item) => `<tr><td>${escapeHtml(item.label)}</td><td>${item.quantity}</td><td>${escapeHtml(item.unit)}</td><td>${item.prepared ? 'Hazır' : 'Bekliyor'}</td></tr>`).join('')
-    popup.document.write(`<html><head><title>${escapeHtml(project.id)} Malzeme Listesi</title><style>body{font-family:Arial;padding:32px;color:#173333}h1{font-size:24px}p{color:#65736f}table{width:100%;border-collapse:collapse;margin-top:24px}th,td{padding:10px;border:1px solid #dfe3dd;text-align:left}th{background:#eef4f1}</style></head><body><h1>Tesisat PRO · Malzeme Listesi</h1><p>${escapeHtml(project.id)} · ${escapeHtml(customer?.name ?? '')} · ${escapeHtml(project.type)}</p><table><thead><tr><th>Malzeme</th><th>Miktar</th><th>Birim</th><th>Durum</th></tr></thead><tbody>${rows}</tbody></table><script>window.onload=()=>window.print()</script></body></html>`)
+    const master = users.find((item) => item.id === project.assignedMasterId)
+    const rows = (project.materials ?? []).map((item, index) => `<tr><td class="number">${index + 1}</td><td class="box">${item.prepared ? '&#9745;' : '&#9744;'}</td><td>${escapeHtml(item.label)}</td><td class="quantity">${item.quantity}</td><td>${escapeHtml(item.unit)}</td><td class="notes"></td></tr>`).join('')
+    popup.document.write(`<html><head><meta charset="utf-8"><title>${escapeHtml(project.id)} Malzeme Kontrol Listesi</title><style>@page{size:A4;margin:14mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#173333;margin:0}header{display:flex;justify-content:space-between;border-bottom:3px solid #176b87;padding-bottom:12px}h1{font-size:22px;margin:0}.brand{color:#176b87;font-weight:700}.meta{display:grid;grid-template-columns:1fr 1fr;gap:7px 20px;margin:16px 0;font-size:12px}.meta span{border-bottom:1px solid #ccd7d5;padding:5px 0}.meta b{display:block;font-size:9px;color:#71817e;margin-bottom:3px}table{width:100%;border-collapse:collapse;margin-top:16px;font-size:11px}th,td{padding:8px;border:1px solid #9caaa7;text-align:left}th{background:#e9f1f4}.number,.quantity{text-align:center;width:46px}.box{width:52px;text-align:center;font-size:22px}.notes{width:125px;height:34px}footer{margin-top:12px;font-size:9px;color:#758481}.signatures{display:grid;grid-template-columns:1fr 1fr;gap:70px;margin-top:38px}.signatures div{border-top:1px solid #758481;padding-top:5px;text-align:center;font-size:10px}@media print{button{display:none}}</style></head><body><header><div><div class="brand">Tesisat PRO</div><h1>Malzeme Kontrol Listesi</h1></div><strong>${escapeHtml(project.id)}</strong></header><div class="meta"><span><b>MÜŞTERİ</b>${escapeHtml(customer?.name ?? '')}</span><span><b>İŞ TÜRÜ</b>${escapeHtml(project.type)}</span><span><b>UYGULAMA GÜNÜ</b>${escapeHtml(project.applicationDate ?? 'Belirlenmedi')}</span><span><b>USTA</b>${escapeHtml(master?.name ?? 'Atanmadı')}</span><span><b>ADRES</b>${escapeHtml(project.siteAddress ?? '')}</span><span><b>HAZIRLIK TARİHİ</b>${escapeHtml(preparationDate(project.applicationDate))}</span></div><table><thead><tr><th>No</th><th>Kontrol</th><th>Malzeme</th><th>Miktar</th><th>Birim</th><th>Not</th></tr></thead><tbody>${rows}</tbody></table><div class="signatures"><div>Hazırlayan usta</div><div>Kontrol eden</div></div><footer>Liste yaklaşık olarak sistem tarafından hazırlanmıştır. Sahaya çıkmadan önce miktarları ve eksikleri kontrol ediniz.</footer><script>window.onload=()=>window.print()</script></body></html>`)
     popup.document.close()
   }
 
@@ -68,10 +92,12 @@ export function Projects() {
       const survey = surveys.find((item) => item.id === project.surveyId)
       const master = users.find((user) => user.id === project.assignedMasterId)
       const manager = users.find((user) => user.id === project.ownerId) ?? users.find((user) => user.role === 'proje' && user.name === project.owner)
+      const materialTemplate = templates.find((item) => item.id === (project.materialTemplateId ?? survey?.templateId))
       const complete = project.currentStage === project.stages.length - 1
       const expanded = expandedId === project.id
       const preparedCount = (project.materials ?? []).filter((item) => item.prepared).length
       const canAdvance = role === 'admin' || role === 'proje' || (role === 'usta' && project.currentStage === 0)
+      const canEditMaterials = role === 'admin' || role === 'usta'
       const siteAddress = project.siteAddress ?? survey?.siteAddress ?? (customer ? `${customer.address}, ${customer.district}` : '')
       const siteContactName = project.siteContactName ?? survey?.siteContactName ?? customer?.name
       const siteContactPhone = project.siteContactPhone ?? survey?.siteContactPhone ?? customer?.phone
@@ -83,7 +109,7 @@ export function Projects() {
         <div className="project-site-info"><div><MapPin size={17} /><span>Uygulama adresi<strong>{siteAddress || 'Adres girilmedi'}</strong></span></div><div><Phone size={17} /><span>Randevu kişisi<strong>{siteContactName ?? 'Belirlenmedi'}{siteContactPhone && ` · ${siteContactPhone}`}</strong></span></div><button disabled={!routeUrl} onClick={() => routeUrl && window.open(routeUrl, '_blank', 'noopener,noreferrer')}><Navigation size={16} /> Yol tarifi al</button></div>
         <footer><div><UserRound size={16} /><span>Usta{role === 'admin' && master ? <button className="entity-name-link compact" onClick={() => setProfile({ kind: 'user', id: master.id })}>{master.name}</button> : <strong>{master?.name ?? 'Atanmadı'}</strong>}</span></div><div><UserRound size={16} /><span>Proje takipçisi{role === 'admin' && manager ? <button className="entity-name-link compact" onClick={() => setProfile({ kind: 'user', id: manager.id })}>{manager.name}</button> : <strong>{project.owner}</strong>}</span></div><div><CalendarClock size={16} /><span>Uygulama günü<strong>{project.applicationDate ? new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${project.applicationDate}T12:00:00`)) : 'Belirlenmedi'}</strong></span></div><div><PackageCheck size={16} /><span>Malzemeler<strong>{preparedCount}/{project.materials?.length ?? 0} hazır</strong></span></div>{!complete && canAdvance && <button onClick={() => updateProject({ ...project, currentStage: project.currentStage + 1 })}>{role === 'usta' ? 'Uygulama tamamlandı' : 'Aşamayı tamamla'} <ChevronRight size={16} /></button>}<button className="project-detail-toggle" onClick={() => setExpandedId(expanded ? null : project.id)}>Detaylar <ChevronDown size={15} /></button></footer>
         {expanded && <div className="project-detail-panel">
-          <section className="material-editor"><div className="detail-section-head"><div><span className="eyebrow">MALZEME LİSTESİ</span><h4>Düzenle ve dışa aktar</h4></div><div><button onClick={() => printPdf(project)}><Printer size={15} /> PDF</button><button onClick={() => exportExcel(project)}><FileSpreadsheet size={15} /> Excel</button></div></div><div className="material-list">{(project.materials ?? []).map((material) => <div key={material.id}><button className={`material-check ${material.prepared ? 'checked' : ''}`} onClick={() => updateMaterial(project, { ...material, prepared: !material.prepared })}>{material.prepared && <Check size={13} />}</button><input value={material.label} onChange={(event) => updateMaterial(project, { ...material, label: event.target.value })} /><input type="number" min="0" value={material.quantity} onChange={(event) => updateMaterial(project, { ...material, quantity: Number(event.target.value) })} /><input value={material.unit} onChange={(event) => updateMaterial(project, { ...material, unit: event.target.value })} /><button className="delete-material" onClick={() => removeMaterial(project, material.id)}><Trash2 size={14} /></button></div>)}</div>{role !== 'musteri' && <div className="add-material-row"><input value={newMaterial.label} onChange={(event) => setNewMaterial({ ...newMaterial, label: event.target.value })} placeholder="Yeni malzeme" /><input type="number" value={newMaterial.quantity} onChange={(event) => setNewMaterial({ ...newMaterial, quantity: Number(event.target.value) })} /><input value={newMaterial.unit} onChange={(event) => setNewMaterial({ ...newMaterial, unit: event.target.value })} /><button onClick={() => addMaterial(project)}><Plus size={14} /> Ekle</button></div>}</section>
+          <section className="material-editor"><div className="detail-section-head material-detail-head"><div><span className="eyebrow">MALZEME KONTROL LİSTESİ</span><h4>{materialTemplate?.name ?? project.type} yaklaşık listesi</h4><small>Hazırlık günü: {preparationDate(project.applicationDate)} · Uygulamadan bir gün önce kontrol edin.</small></div><div>{canEditMaterials && materialTemplate && <button onClick={() => applyMaterialTemplate(project)}><RotateCcw size={15} /> Şablonu uygula</button>}{role === 'admin' && materialTemplate && <button onClick={() => saveMaterialsToTemplate(project)}><Save size={15} /> Şablona kaydet</button>}<button onClick={() => printPdf(project)}><Printer size={15} /> PDF checklist</button><button onClick={() => exportExcel(project)}><FileSpreadsheet size={15} /> Excel</button></div></div><div className="material-list">{(project.materials ?? []).map((material) => <div key={material.id}><button disabled={!canEditMaterials} className={`material-check ${material.prepared ? 'checked' : ''}`} onClick={() => updateMaterial(project, { ...material, prepared: !material.prepared })}>{material.prepared && <Check size={13} />}</button><input disabled={!canEditMaterials} value={material.label} onChange={(event) => updateMaterial(project, { ...material, label: event.target.value })} /><input disabled={!canEditMaterials} type="number" min="0" value={material.quantity} onChange={(event) => updateMaterial(project, { ...material, quantity: Number(event.target.value) })} /><input disabled={!canEditMaterials} value={material.unit} onChange={(event) => updateMaterial(project, { ...material, unit: event.target.value })} />{canEditMaterials ? <button className="delete-material" onClick={() => removeMaterial(project, material.id)}><Trash2 size={14} /></button> : <span />}</div>)}</div>{canEditMaterials && <div className="add-material-row"><input value={newMaterial.label} onChange={(event) => setNewMaterial({ ...newMaterial, label: event.target.value })} placeholder="Yeni malzeme" /><input type="number" value={newMaterial.quantity} onChange={(event) => setNewMaterial({ ...newMaterial, quantity: Number(event.target.value) })} /><input value={newMaterial.unit} onChange={(event) => setNewMaterial({ ...newMaterial, unit: event.target.value })} /><button onClick={() => addMaterial(project)}><Plus size={14} /> Ekle</button></div>}</section>
           <ProjectEvidenceEditor project={project} survey={survey} role={role} onUpdate={updateProject} onUpload={(event) => upload(project, event)} />
         </div>}
       </article>
