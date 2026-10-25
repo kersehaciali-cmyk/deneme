@@ -24,12 +24,21 @@ export function Users() {
     event.preventDefault()
     const data = new FormData(event.currentTarget)
     const values = {
-      name: String(data.get('name')),
-      phone: String(data.get('phone')),
-      email: String(data.get('email')),
+      name: String(data.get('name')).trim(),
+      phone: String(data.get('phone')).trim(),
+      email: String(data.get('email')).trim(),
       role: String(data.get('role')) as Role,
       active: data.get('active') === 'on',
       customerId: String(data.get('customerId') ?? '') || undefined,
+    }
+    if (!values.name) {
+      setError('Ad soyad alanını doldurun.')
+      return
+    }
+    const phoneDigits = values.phone.replace(/\D/g, '')
+    if (phoneDigits.length < 10) {
+      setError(`Telefon numarası en az 10 rakam içermelidir. Şu anda ${phoneDigits.length} rakam algılandı.`)
+      return
     }
     if (values.role === 'musteri' && !values.customerId) {
       setError('Müşteri rolü için bağlı müşteri/cari kaydını seçin.')
@@ -78,7 +87,7 @@ function UserModal({ open, user, customers, busy, error, onClose, onSave }: { op
   const values = user ?? emptyUser
   return <Modal open={open} onClose={onClose} eyebrow="KULLANICI HESABI" title={user ? 'Kullanıcıyı düzenle' : 'Yeni kullanıcı'}>
     <form className="modal-form" key={user?.id ?? 'new'} onSubmit={onSave}>
-      <div className="form-grid two"><label><span>Ad soyad</span><input name="name" defaultValue={values.name} required /></label><label><span>Telefon</span><input name="phone" defaultValue={values.phone} required /></label></div>
+      <div className="form-grid two"><label><span>Ad soyad</span><input name="name" defaultValue={values.name} required /></label><label><span>Telefon</span><input name="phone" type="tel" inputMode="tel" defaultValue={values.phone} required placeholder="05xx xxx xx xx" /><small>En az 10 rakam girin. E-posta yoksa bu numarayla giriş yapılır.</small></label></div>
       <div className="form-grid two"><label><span>E-posta (isteğe bağlı)</span><input type="email" name="email" defaultValue={values.email} placeholder="E-posta yoksa boş bırakın" /></label><label><span>Rol</span><select name="role" defaultValue={values.role}>{Object.entries(roleLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label></div>
       <label className="field user-customer-field"><span>Bağlı müşteri / cari</span><select name="customerId" defaultValue={values.customerId ?? ''}><option value="">Personel hesabı / bağlı müşteri yok</option>{customers.map((customer) => <option value={customer.id} key={customer.id}>{customer.name} · {customer.phone}</option>)}</select><small>Rol “Müşteri” ise zorunludur; müşteri sadece kendi proje ve ödemelerini görür.</small></label>
       <label className="field user-password-field"><span>{user ? 'Yönetici yeni şifresi' : 'İlk şifre'}</span><div><KeyRound size={16} /><input type="password" name="password" minLength={8} autoComplete="new-password" placeholder={user ? 'Değişmeyecekse boş bırakın' : 'E-postasız hesapta zorunlu'} /></div><small>{user ? 'Yazarsanız kullanıcının şifresi doğrudan değiştirilir.' : 'E-posta varsa davet bağlantısı gider; e-posta yoksa bu şifreyle telefon numarasından giriş yapılır.'}</small></label>

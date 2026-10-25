@@ -23,16 +23,21 @@ Deno.serve(async (request) => {
     const body = await request.json()
     const action = String(body.action ?? '')
     const user = body.user ?? {}
+    const name = String(user.name ?? '').trim()
+    const role = String(user.role ?? '')
     const realEmail = String(user.email ?? '').trim().toLowerCase()
-    const phoneDigits = String(user.phone ?? '').replace(/\D/g, '')
-    if (!user.name || phoneDigits.length < 10 || !['admin', 'usta', 'proje', 'musteri'].includes(user.role)) throw new Error('Kullanıcı bilgileri eksik veya geçersiz.')
-    if (user.role === 'musteri' && !user.customerId) throw new Error('Müşteri hesabı için bağlı cari kaydı gerekir.')
+    const phone = String(user.phone ?? '').trim()
+    const phoneDigits = phone.replace(/\D/g, '')
+    if (!name) throw new Error('Ad soyad alanı boş bırakılamaz.')
+    if (phoneDigits.length < 10) throw new Error(`Telefon numarası en az 10 rakam içermelidir. ${phoneDigits.length} rakam algılandı.`)
+    if (!['admin', 'usta', 'proje', 'musteri'].includes(role)) throw new Error(`Geçersiz kullanıcı rolü: ${role || 'boş'}.`)
+    if (role === 'musteri' && !user.customerId) throw new Error('Müşteri hesabı için bağlı cari kaydı gerekir.')
     if (user.customerId) {
       const { data: customer } = await adminClient.from('app_records').select('entity_id').eq('organization_id', caller.organization_id).eq('entity_type', 'customer').eq('entity_id', user.customerId).maybeSingle()
       if (!customer) throw new Error('Bağlı müşteri kaydı bu şirkette bulunamadı.')
     }
     const authenticationEmail = realEmail || `${phoneDigits}@phone.tesisatpro.local`
-    const metadata = { name: user.name, phone: user.phone ?? '', role: user.role, customer_id: user.customerId ?? null, organization_id: caller.organization_id }
+    const metadata = { name, phone, role, customer_id: user.customerId ?? null, organization_id: caller.organization_id }
 
     if (action === 'create') {
       let createdUser
@@ -48,7 +53,7 @@ Deno.serve(async (request) => {
         createdUser = data.user
       }
       if (!createdUser) throw new Error('Kullanıcı hesabı oluşturulamadı.')
-      const { error: upsertError } = await adminClient.from('profiles').upsert({ id: createdUser.id, organization_id: caller.organization_id, customer_id: user.customerId ?? null, name: user.name, phone: user.phone ?? '', email: realEmail, role: user.role, active: user.active !== false })
+      const { error: upsertError } = await adminClient.from('profiles').upsert({ id: createdUser.id, organization_id: caller.organization_id, customer_id: user.customerId ?? null, name, phone, email: realEmail, role, active: user.active !== false })
       if (upsertError) throw upsertError
     } else if (action === 'update') {
       if (!user.id) throw new Error('Kullanıcı kimliği bulunamadı.')
@@ -62,7 +67,7 @@ Deno.serve(async (request) => {
       }
       const { error } = await adminClient.auth.admin.updateUserById(user.id, attributes)
       if (error) throw error
-      const { error: updateError } = await adminClient.from('profiles').update({ customer_id: user.customerId ?? null, name: user.name, phone: user.phone ?? '', email: realEmail, role: user.role, active: user.active !== false }).eq('id', user.id).eq('organization_id', caller.organization_id)
+      const { error: updateError } = await adminClient.from('profiles').update({ customer_id: user.customerId ?? null, name, phone, email: realEmail, role, active: user.active !== false }).eq('id', user.id).eq('organization_id', caller.organization_id)
       if (updateError) throw updateError
     } else throw new Error('Geçersiz işlem.')
 
